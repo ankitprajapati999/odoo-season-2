@@ -1,37 +1,41 @@
 import {
-  Show,
+  SignedIn,
+  SignedOut,
   SignInButton,
   SignUpButton,
   UserButton,
 } from "@clerk/react";
+
 import TestPage from "./pages/test";
 
 export default function App() {
   return (
-    <div
-      style={{
-        padding: "40px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          gap: "12px",
-          marginBottom: "30px",
-          alignItems: "center",
-        }}
-      >
-        <Show when="signed-out">
-          <SignInButton />
-          <SignUpButton />
-        </Show>
+    <div style={{ padding: "40px" }}>
+      <SignedOut>
+        <h1>Odoo Hackathon Season 2</h1>
 
-        <Show when="signed-in">
+        <p>Please sign in to continue.</p>
+
+        <SignInButton />
+
+        <span style={{ margin: "0 10px" }} />
+
+        <SignUpButton />
+      </SignedOut>
+
+      <SignedIn>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "20px",
+          }}
+        >
           <UserButton />
-        </Show>
-      </div>
+        </div>
 
-      <TestPage />
+        <TestPage />
+      </SignedIn>
     </div>
   );
 }

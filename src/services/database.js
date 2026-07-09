@@ -1,20 +1,22 @@
-import { supabase } from "./supabase";
-
 /**
  * ============================================================
  * Database Service
  * ============================================================
  *
- * This file provides generic CRUD operations for all database
- * tables. React components should NEVER call:
+ * Generic CRUD helper for Supabase.
  *
- *      supabase.from(...)
+ * IMPORTANT:
+ * This file NEVER creates a Supabase client.
  *
- * directly.
+ * React components must first obtain an authenticated client:
  *
- * If additional database functionality is needed during the
- * hackathon, extend this file instead of duplicating queries
- * throughout the project.
+ *    const supabase = useSupabase();
+ *
+ * Then pass it into these functions:
+ *
+ *    database.list(supabase, "messages");
+ *
+ * This keeps authentication separated from database logic.
  * ============================================================
  */
 
@@ -25,14 +27,10 @@ function handleError(error, action) {
 }
 
 /**
- * Create a new record.
- *
- * @param {string} table
- * @param {object} data
- * @returns {Promise<object>}
+ * Create a record
  */
-async function create(table, data) {
-  const { data: result, error } = await supabase
+async function create(client, table, data) {
+  const { data: result, error } = await client
     .from(table)
     .insert(data)
     .select()
@@ -44,15 +42,10 @@ async function create(table, data) {
 }
 
 /**
- * Get a single record by ID.
- *
- * @param {string} table
- * @param {string|number} id
- * @param {string} idColumn
- * @returns {Promise<object|null>}
+ * Get one record by ID
  */
-async function getById(table, id, idColumn = "id") {
-  const { data, error } = await supabase
+async function getById(client, table, id, idColumn = "id") {
+  const { data, error } = await client
     .from(table)
     .select("*")
     .eq(idColumn, id)
@@ -64,24 +57,12 @@ async function getById(table, id, idColumn = "id") {
 }
 
 /**
- * Get all records.
- *
- * Optional:
- * {
- *   filters: {
- *      status: "active",
- *      role: "admin"
- *   }
- * }
- *
- * @param {string} table
- * @param {object} options
- * @returns {Promise<object[]>}
+ * List records
  */
-async function list(table, options = {}) {
+async function list(client, table, options = {}) {
   const { filters = {} } = options;
 
-  let query = supabase
+  let query = client
     .from(table)
     .select("*");
 
@@ -97,16 +78,10 @@ async function list(table, options = {}) {
 }
 
 /**
- * Update a record.
- *
- * @param {string} table
- * @param {string|number} id
- * @param {object} updates
- * @param {string} idColumn
- * @returns {Promise<object>}
+ * Update a record
  */
-async function update(table, id, updates, idColumn = "id") {
-  const { data, error } = await supabase
+async function update(client, table, id, updates, idColumn = "id") {
+  const { data, error } = await client
     .from(table)
     .update(updates)
     .eq(idColumn, id)
@@ -119,15 +94,10 @@ async function update(table, id, updates, idColumn = "id") {
 }
 
 /**
- * Delete a record.
- *
- * @param {string} table
- * @param {string|number} id
- * @param {string} idColumn
- * @returns {Promise<boolean>}
+ * Delete a record
  */
-async function deleteRecord(table, id, idColumn = "id") {
-  const { error } = await supabase
+async function deleteRecord(client, table, id, idColumn = "id") {
+  const { error } = await client
     .from(table)
     .delete()
     .eq(idColumn, id);
@@ -137,12 +107,10 @@ async function deleteRecord(table, id, idColumn = "id") {
   return true;
 }
 
-const database = {
+export default {
   create,
   getById,
   list,
   update,
   deleteRecord,
 };
-
-export default database;

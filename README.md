@@ -1,16 +1,99 @@
-# React + Vite
+# Odoo Hackathon Season 2
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack web application built for the Odoo Hackathon using modern web technologies with secure authentication and Row Level Security.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech Stack
 
-## React Compiler
+### Frontend
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React
+- Vite
 
-## Expanding the ESLint configuration
+### Authentication
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Clerk
+
+### Database
+
+- Supabase
+- PostgreSQL
+- Row Level Security (RLS)
+
+---
+
+## Project Structure
+
+```
+src
+├── auth
+│   └── supabase.js
+│
+├── services
+│   └── database.js
+│
+├── components
+├── pages
+├── layouts
+├── hooks
+├── contexts
+└── utils
+```
+
+---
+
+## Authentication Flow
+
+```
+React Page
+      │
+      ▼
+useSupabase()
+      │
+      ▼
+Authenticated Supabase Client
+      │
+      ▼
+database.js
+      │
+      ▼
+Supabase
+      │
+      ▼
+PostgreSQL + RLS
+```
+
+---
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Environment Variables
+
+```
+VITE_CLERK_PUBLISHABLE_KEY=
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_CLERK_JWT_TEMPLATE=
+```
+
+---
+
+## Notes
+
+- Clerk handles authentication.
+- Supabase handles the database and storage.
+- PostgreSQL Row Level Security protects user data.
+- Database access should always go through `services/database.js`.
+- Authenticated Supabase clients should always be created using `auth/supabase.js`.
+
+---
+
+Built for Odoo Hackathon Season 2 🚀
