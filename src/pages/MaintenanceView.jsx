@@ -119,6 +119,15 @@ export default function MaintenanceView({ role }) {
     : statusType === "success" ? "text-emerald-400 border-emerald-800/50 bg-emerald-950/30"
     : "text-zinc-300 border-zinc-800 bg-zinc-950";
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-4">
+        <img src="/favicon.png" className="w-12 h-12 animate-spin drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" alt="Loading" />
+        <span className="text-xs font-semibold uppercase tracking-wider">Loading maintenance registry...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
