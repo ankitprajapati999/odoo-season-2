@@ -1,6 +1,5 @@
 import {
-  SignedIn,
-  SignedOut,
+  Show,
   SignInButton,
   SignUpButton,
   UserButton,
@@ -11,7 +10,7 @@ import TestPage from "./pages/test";
 export default function App() {
   return (
     <div style={{ padding: "40px" }}>
-      <SignedOut>
+      <Show when="signed-out">
         <h1>Odoo Hackathon Season 2</h1>
 
         <p>Please sign in to continue.</p>
@@ -21,9 +20,9 @@ export default function App() {
         <span style={{ margin: "0 10px" }} />
 
         <SignUpButton />
-      </SignedOut>
+      </Show>
 
-      <SignedIn>
+      <Show when="signed-in">
         <div
           style={{
             display: "flex",
@@ -35,7 +34,7 @@ export default function App() {
         </div>
 
         <TestPage />
-      </SignedIn>
+      </Show>
     </div>
   );
 }
