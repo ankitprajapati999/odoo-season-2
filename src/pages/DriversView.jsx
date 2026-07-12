@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Users, ShieldAlert, Award } from "lucide-react";
+import { Plus, Search, Users, ShieldAlert, Award, MoreVertical, Edit, Trash2, AlertTriangle } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
 
@@ -12,8 +12,9 @@ export default function DriversView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("All");
 
-  // Add Driver Form State
+  // Add/Edit Driver Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [newDriver, setNewDriver] = useState({
     id: "",
     name: "",
@@ -22,6 +23,11 @@ export default function DriversView() {
     status: "Active",
     phone: ""
   });
+
+  // Meatballs Dropdown & Delete States
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState(null);
 
   useEffect(() => {
     async function loadDrivers() {
@@ -44,23 +50,74 @@ export default function DriversView() {
     return matchSearch && matchStatus;
   });
 
-  const handleAddDriver = async (e) => {
+  const handleOpenAddModal = () => {
+    setIsEditMode(false);
+    setNewDriver({
+      id: "",
+      name: "",
+      license_number: "",
+      safety_score: 95,
+      status: "Active",
+      phone: ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (driver) => {
+    setIsEditMode(true);
+    setNewDriver({
+      id: driver.id,
+      name: driver.name,
+      license_number: driver.license_number,
+      safety_score: driver.safety_score,
+      status: driver.status,
+      phone: driver.phone || ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveDriver = async (e) => {
     e.preventDefault();
     if (!newDriver.id || !newDriver.name || !newDriver.license_number) return;
 
-    const result = await fleetService.createDriver(supabase, newDriver);
+    if (isEditMode) {
+      const result = await fleetService.updateDriver(supabase, newDriver.id, {
+        name: newDriver.name,
+        license_number: newDriver.license_number,
+        safety_score: newDriver.safety_score,
+        status: newDriver.status,
+        phone: newDriver.phone
+      });
+      if (result) {
+        const data = await fleetService.getDrivers(supabase);
+        setDrivers(data);
+        setIsModalOpen(false);
+      }
+    } else {
+      const isDuplicate = drivers.some(
+        (d) => d.id.toLowerCase() === newDriver.id.toLowerCase()
+      );
+      if (isDuplicate) {
+        alert(`Driver ID "${newDriver.id}" already exists.`);
+        return;
+      }
+      const result = await fleetService.createDriver(supabase, newDriver);
+      if (result) {
+        const data = await fleetService.getDrivers(supabase);
+        setDrivers(data);
+        setIsModalOpen(false);
+      }
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!driverToDelete) return;
+    const result = await fleetService.deleteDriver(supabase, driverToDelete.id);
     if (result) {
       const data = await fleetService.getDrivers(supabase);
       setDrivers(data);
-      setIsModalOpen(false);
-      setNewDriver({
-        id: "",
-        name: "",
-        license_number: "",
-        safety_score: 95,
-        status: "Active",
-        phone: ""
-      });
+      setIsDeleteOpen(false);
+      setDriverToDelete(null);
     }
   };
 
@@ -73,7 +130,7 @@ export default function DriversView() {
           <p className="text-sm text-zinc-400">Track driver licenses, status, and automated safety scores.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-amber-500/20"
         >
           <Plus className="w-4 h-4 stroke-[3]" /> Add Driver
@@ -122,6 +179,7 @@ export default function DriversView() {
                 <th className="py-3.5 px-4">Phone</th>
                 <th className="py-3.5 px-4">Safety Score</th>
                 <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 w-12 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-850 text-xs text-zinc-300">
@@ -175,12 +233,52 @@ export default function DriversView() {
                         {driver.status}
                       </span>
                     </td>
+                    <td className="py-4 px-4 text-center relative">
+                      <button
+                        onClick={() => setActiveDropdown(activeDropdown === driver.id ? null : driver.id)}
+                        className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {activeDropdown === driver.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setActiveDropdown(null)} 
+                          />
+                          <div className="absolute right-4 mt-2 w-28 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                            <button
+                              onClick={() => {
+                                handleOpenEditModal(driver);
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-zinc-500" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDriverToDelete(driver);
+                                setIsDeleteOpen(true);
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 hover:text-rose-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {filteredDrivers.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-zinc-500">
+                  <td colSpan="7" className="py-8 text-center text-zinc-500">
                     No drivers found matching filters.
                   </td>
                 </tr>
@@ -195,7 +293,7 @@ export default function DriversView() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Add New Driver</h3>
+              <h3 className="text-lg font-bold text-white">{isEditMode ? "Edit Driver Details" : "Add New Driver"}</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-zinc-400 hover:text-white font-semibold text-lg cursor-pointer"
@@ -204,16 +302,17 @@ export default function DriversView() {
               </button>
             </div>
 
-            <form onSubmit={handleAddDriver} className="space-y-4">
+            <form onSubmit={handleSaveDriver} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs text-zinc-400 font-medium">Driver ID (e.g. DRV-007)</label>
                 <input
                   type="text"
                   required
+                  disabled={isEditMode}
                   placeholder="DRV-007"
                   value={newDriver.id}
                   onChange={(e) => setNewDriver({ ...newDriver, id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-655"
+                  className={`w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-655 ${isEditMode ? "opacity-50 cursor-not-allowed" : ""}`}
                 />
               </div>
 
@@ -294,10 +393,43 @@ export default function DriversView() {
                   type="submit"
                   className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition cursor-pointer shadow-md shadow-amber-500/20"
                 >
-                  Add Driver
+                  {isEditMode ? "Save Changes" : "Add Driver"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteOpen && driverToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl text-center space-y-4">
+            <div className="h-12 w-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white">Delete Driver</h3>
+              <p className="text-sm text-zinc-400">
+                Are you sure you want to delete driver <strong>{driverToDelete.name}</strong> (<code>{driverToDelete.id}</code>)? This action is permanent and cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setIsDeleteOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
+              >
+                Keep Driver
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

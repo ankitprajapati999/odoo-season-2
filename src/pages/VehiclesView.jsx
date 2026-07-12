@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Truck, ShieldAlert } from "lucide-react";
+import { Plus, Search, Truck, ShieldAlert, MoreVertical, Edit, Trash2, AlertTriangle } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
 
@@ -15,6 +15,7 @@ export default function VehiclesView({ role }) {
 
   // Form Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [newVehicle, setNewVehicle] = useState({
     id: "",
     name: "",
@@ -25,6 +26,11 @@ export default function VehiclesView({ role }) {
     status: "Active",
     license_plate: ""
   });
+
+  // Meatballs Dropdown & Delete Modal States
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState(null);
 
   useEffect(() => {
     async function loadVehicles() {
@@ -48,27 +54,80 @@ export default function VehiclesView({ role }) {
     return matchSearch && matchType && matchStatus;
   });
 
-  const handleAddVehicle = async (e) => {
+  const handleOpenAddModal = () => {
+    setIsEditMode(false);
+    setNewVehicle({
+      id: "",
+      name: "",
+      type: "Truck",
+      capacity: "",
+      region: "North",
+      fuel_efficiency: "",
+      status: "Active",
+      license_plate: ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (vehicle) => {
+    setIsEditMode(true);
+    setNewVehicle({
+      id: vehicle.id,
+      name: vehicle.name,
+      type: vehicle.type,
+      capacity: vehicle.capacity,
+      region: vehicle.region,
+      fuel_efficiency: vehicle.fuel_efficiency,
+      status: vehicle.status,
+      license_plate: vehicle.license_plate || ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveVehicle = async (e) => {
     e.preventDefault();
     if (!newVehicle.id || !newVehicle.name) return;
 
-    const result = await fleetService.createVehicle(supabase, newVehicle);
+    if (isEditMode) {
+      const result = await fleetService.updateVehicle(supabase, newVehicle.id, {
+        name: newVehicle.name,
+        type: newVehicle.type,
+        capacity: newVehicle.capacity,
+        region: newVehicle.region,
+        fuel_efficiency: newVehicle.fuel_efficiency,
+        status: newVehicle.status,
+        license_plate: newVehicle.license_plate
+      });
+      if (result) {
+        const data = await fleetService.getVehicles(supabase);
+        setVehicles(data);
+        setIsModalOpen(false);
+      }
+    } else {
+      const isDuplicate = vehicles.some(
+        (v) => v.id.toLowerCase() === newVehicle.id.toLowerCase()
+      );
+      if (isDuplicate) {
+        alert(`Vehicle ID "${newVehicle.id}" already exists in the registry.`);
+        return;
+      }
+      const result = await fleetService.createVehicle(supabase, newVehicle);
+      if (result) {
+        const data = await fleetService.getVehicles(supabase);
+        setVehicles(data);
+        setIsModalOpen(false);
+      }
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!vehicleToDelete) return;
+    const result = await fleetService.deleteVehicle(supabase, vehicleToDelete.id);
     if (result) {
-      // Re-fetch to guarantee up-to-date state
       const data = await fleetService.getVehicles(supabase);
       setVehicles(data);
-      setIsModalOpen(false);
-      // Reset form
-      setNewVehicle({
-        id: "",
-        name: "",
-        type: "Truck",
-        capacity: "",
-        region: "North",
-        fuel_efficiency: "",
-        status: "Active",
-        license_plate: ""
-      });
+      setIsDeleteOpen(false);
+      setVehicleToDelete(null);
     }
   };
 
@@ -82,7 +141,7 @@ export default function VehiclesView({ role }) {
         </div>
         {role === 'Fleet Manager' && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-amber-500/20"
           >
             <Plus className="w-4 h-4 stroke-[3]" /> Add Vehicle
@@ -147,6 +206,7 @@ export default function VehiclesView({ role }) {
                 <th className="py-3.5 px-4">Region</th>
                 <th className="py-3.5 px-4">Efficiency</th>
                 <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 w-12 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-850 text-xs text-zinc-300">
@@ -186,12 +246,52 @@ export default function VehiclesView({ role }) {
                         {vehicle.status}
                       </span>
                     </td>
+                    <td className="py-4 px-4 text-center relative">
+                      <button
+                        onClick={() => setActiveDropdown(activeDropdown === vehicle.id ? null : vehicle.id)}
+                        className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {activeDropdown === vehicle.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setActiveDropdown(null)} 
+                          />
+                          <div className="absolute right-4 mt-2 w-28 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                            <button
+                              onClick={() => {
+                                handleOpenEditModal(vehicle);
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-zinc-500" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVehicleToDelete(vehicle);
+                                setIsDeleteOpen(true);
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 hover:text-rose-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {filteredVehicles.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-zinc-500">
+                  <td colSpan="9" className="py-8 text-center text-zinc-500">
                     No vehicles found in registry matching filters.
                   </td>
                 </tr>
@@ -206,7 +306,7 @@ export default function VehiclesView({ role }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Add New Vehicle</h3>
+              <h3 className="text-lg font-bold text-white">{isEditMode ? "Edit Vehicle Details" : "Add New Vehicle"}</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-zinc-400 hover:text-white font-semibold text-lg cursor-pointer"
@@ -215,16 +315,17 @@ export default function VehiclesView({ role }) {
               </button>
             </div>
 
-            <form onSubmit={handleAddVehicle} className="space-y-3.5">
+            <form onSubmit={handleSaveVehicle} className="space-y-3.5">
               <div className="space-y-1">
                 <label className="text-xs text-zinc-400 font-medium">Vehicle ID (e.g. VEH-009)</label>
                 <input
                   type="text"
                   required
+                  disabled={isEditMode}
                   placeholder="VEH-009"
                   value={newVehicle.id}
                   onChange={(e) => setNewVehicle({ ...newVehicle, id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600"
+                  className={`w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600 ${isEditMode ? "opacity-50 cursor-not-allowed" : ""}`}
                 />
               </div>
 
@@ -335,10 +436,43 @@ export default function VehiclesView({ role }) {
                   type="submit"
                   className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition cursor-pointer shadow-md shadow-amber-500/20"
                 >
-                  Add Vehicle
+                  {isEditMode ? "Save Changes" : "Add Vehicle"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteOpen && vehicleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl text-center space-y-4">
+            <div className="h-12 w-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white">Delete Vehicle</h3>
+              <p className="text-sm text-zinc-400">
+                Are you sure you want to delete vehicle <strong>{vehicleToDelete.name}</strong> (<code>{vehicleToDelete.id}</code>)? This action is permanent and cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setIsDeleteOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
+              >
+                Keep Vehicle
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

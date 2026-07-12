@@ -103,19 +103,169 @@ export default {
     return safeCreate(supabase, 'vehicles', vehicleData, mockVehicles);
   },
 
+  async updateVehicle(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'vehicles', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating vehicle in db failed, simulating locally:`, error.message);
+      const index = mockVehicles.findIndex((v) => v.id === id);
+      if (index !== -1) {
+        mockVehicles[index] = { ...mockVehicles[index], ...updates };
+        return mockVehicles[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteVehicle(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'vehicles', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting vehicle in db failed, simulating locally:`, error.message);
+      const index = mockVehicles.findIndex((v) => v.id === id);
+      if (index !== -1) {
+        mockVehicles.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
+  },
+
   async createDriver(supabase, driverData) {
     return safeCreate(supabase, 'drivers', driverData, mockDrivers);
+  },
+
+  async updateDriver(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'drivers', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating driver failed, simulating locally:`, error.message);
+      const index = mockDrivers.findIndex((d) => d.id === id);
+      if (index !== -1) {
+        mockDrivers[index] = { ...mockDrivers[index], ...updates };
+        return mockDrivers[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteDriver(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'drivers', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting driver failed, simulating locally:`, error.message);
+      const index = mockDrivers.findIndex((d) => d.id === id);
+      if (index !== -1) {
+        mockDrivers.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
   },
 
   async createTrip(supabase, tripData) {
     return safeCreate(supabase, 'trips', tripData, mockTrips);
   },
 
+  async updateTrip(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'trips', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating trip failed, simulating locally:`, error.message);
+      const index = mockTrips.findIndex((t) => t.id === id);
+      if (index !== -1) {
+        mockTrips[index] = { ...mockTrips[index], ...updates };
+        return mockTrips[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteTrip(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'trips', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting trip failed, simulating locally:`, error.message);
+      const index = mockTrips.findIndex((t) => t.id === id);
+      if (index !== -1) {
+        mockTrips.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
+  },
+
   async createMaintenance(supabase, maintenanceData) {
     return safeCreate(supabase, 'maintenance', maintenanceData, mockMaintenance);
   },
 
+  async updateMaintenance(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'maintenance', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating maintenance failed, simulating locally:`, error.message);
+      const index = mockMaintenance.findIndex((m) => m.id === id);
+      if (index !== -1) {
+        mockMaintenance[index] = { ...mockMaintenance[index], ...updates };
+        return mockMaintenance[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteMaintenance(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'maintenance', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting maintenance failed, simulating locally:`, error.message);
+      const index = mockMaintenance.findIndex((m) => m.id === id);
+      if (index !== -1) {
+        mockMaintenance.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
+  },
+
   async createExpense(supabase, expenseData) {
     return safeCreate(supabase, 'expenses', expenseData, mockExpenses);
+  },
+
+  async updateExpense(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'expenses', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating expense failed, simulating locally:`, error.message);
+      const index = mockExpenses.findIndex((e) => e.id === id);
+      if (index !== -1) {
+        mockExpenses[index] = { ...mockExpenses[index], ...updates };
+        return mockExpenses[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteExpense(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'expenses', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting expense failed, simulating locally:`, error.message);
+      const index = mockExpenses.findIndex((e) => e.id === id);
+      if (index !== -1) {
+        mockExpenses.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
   }
 };
