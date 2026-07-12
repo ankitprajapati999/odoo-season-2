@@ -101,8 +101,6 @@ function DashboardShell() {
         const data = await database.getById(supabase, "profiles", user.id);
         if (data) {
           setProfile(data);
-          const links = getSidebarLinks(data.role);
-          if (links.length > 0) setActiveTab(links[0].name);
         } else {
           // Profile does not exist (New Sign Up)
           // Read selected role from localStorage
@@ -119,8 +117,6 @@ function DashboardShell() {
           const result = await database.create(supabase, "profiles", newProfile);
           setProfile(result);
           localStorage.setItem(`profile_${user.id}`, JSON.stringify(result));
-          const links = getSidebarLinks(result.role);
-          if (links.length > 0) setActiveTab(links[0].name);
         }
       } catch (error) {
         console.warn("Profiles table check failed. Falling back to local storage profile.", error.message);
@@ -128,8 +124,6 @@ function DashboardShell() {
         if (cached) {
           const parsed = JSON.parse(cached);
           setProfile(parsed);
-          const links = getSidebarLinks(parsed.role);
-          if (links.length > 0) setActiveTab(links[0].name);
         } else {
           // Create a mock local profile for hackathon offline demo
           const selectedRole = localStorage.getItem("selected_role") || "Fleet Manager";
@@ -142,8 +136,6 @@ function DashboardShell() {
           };
           setProfile(fallbackProfile);
           localStorage.setItem(`profile_${user.id}`, JSON.stringify(fallbackProfile));
-          const links = getSidebarLinks(dbRole);
-          if (links.length > 0) setActiveTab(links[0].name);
         }
       } finally {
         setLoadingProfile(false);
