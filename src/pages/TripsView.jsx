@@ -37,6 +37,7 @@ export default function TripsView({ role }) {
   }
 
   useEffect(() => {
+    if (!supabase) return;
     async function init() { await reload(); setLoading(false); }
     init();
   }, [supabase]);

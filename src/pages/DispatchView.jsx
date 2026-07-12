@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Send, MapPin, Truck, Users, CheckCircle, MoreVertical, Edit, Trash2, AlertTriangle, XCircle } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/react";
 
 export default function DispatchView({ role }) {
   const supabase = useSupabase();
@@ -51,7 +51,7 @@ export default function DispatchView({ role }) {
     setTrips(t || []);
   }
 
-  useEffect(() => { reload(); }, [supabase]);
+  useEffect(() => { if (!supabase) return; reload(); }, [supabase]);
 
   // Only show available vehicles and drivers for dispatch form
   const availableVehicles = vehicles.filter(v => v.status === "Available");

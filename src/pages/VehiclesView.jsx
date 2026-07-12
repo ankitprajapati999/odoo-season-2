@@ -42,6 +42,7 @@ export default function VehiclesView({ role }) {
   }
 
   useEffect(() => {
+    if (!supabase) return;
     async function init() {
       await reload();
       setLoading(false);

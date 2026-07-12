@@ -36,6 +36,7 @@ export default function MaintenanceView({ role }) {
   }
 
   useEffect(() => {
+    if (!supabase) return;
     async function init() { await reload(); setLoading(false); }
     init();
   }, [supabase]);

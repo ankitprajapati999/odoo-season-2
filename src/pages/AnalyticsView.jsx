@@ -14,6 +14,7 @@ export default function AnalyticsView({ role }) {
   const [maintenance, setMaintenance] = useState([]);
 
   useEffect(() => {
+    if (!supabase) return;
     async function loadAll() {
       const [v, d, t, e, f, m] = await Promise.all([
         fleetService.getVehicles(supabase),

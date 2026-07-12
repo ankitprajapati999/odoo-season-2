@@ -27,6 +27,7 @@ export default function DashboardView({ role }) {
   const [selectedRegion, setSelectedRegion] = useState("All");
 
   useEffect(() => {
+    if (!supabase) return;
     async function loadData() {
       try {
         const [v, t, m, d] = await Promise.all([
@@ -48,6 +49,7 @@ export default function DashboardView({ role }) {
     }
     loadData();
   }, [supabase]);
+
 
   // Filter Logic
   const filteredVehicles = vehicles.filter(v => {
