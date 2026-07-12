@@ -94,7 +94,6 @@ export default function TripsView({ role }) {
     return matchSearch && matchStatus;
   });
 
-<<<<<<< HEAD
   const badgeClass = (status) => {
     switch (status) {
       case "Dispatched": return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
@@ -104,7 +103,7 @@ export default function TripsView({ role }) {
       default:           return "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20";
     }
   };
-=======
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-4">
@@ -113,7 +112,6 @@ export default function TripsView({ role }) {
       </div>
     );
   }
->>>>>>> origin/feature/driver-trip
 
   return (
     <div className="space-y-6">
