@@ -390,3 +390,31 @@ Before finishing any task, ask yourself:
 - Did I document my work?
 
 If any answer is "No", correct it before completing the task.
+
+---
+
+# TransitOps Specific Rules
+
+## 1. Database Schema is Production-Ready
+The database schema has been designed and finalized in `supabase_schema_and_guide.md`.
+Never:
+- Create new tables, drop tables, rename tables, or rename columns.
+- Add or remove columns.
+- Modify triggers, PostgreSQL functions, constraints, or RLS policies.
+- Generate migrations or run schema modification commands.
+- If a schema modification appears necessary, stop and ask the project owner.
+
+## 2. Business Logic is Database-Enforced
+Do not duplicate business rules in frontend code:
+- Status transitions for vehicles and drivers are handled automatically via triggers when inserting or updating `trips` or `maintenance_logs`.
+- Cargo capacity, driver license expiry, and suspended status checks are validated via database constraints and triggers.
+
+## 3. Database Access Methods
+- NEVER create a new Supabase client. Always use `useSupabase()` from `src/auth/supabase.js`.
+- NEVER query the database directly in components (do not use `supabase.from(...)`).
+- ALWAYS call the centralized CRUD helpers from `src/services/database.js`:
+  - `database.list()`
+  - `database.getById()`
+  - `database.create()`
+  - `database.update()`
+  - `database.deleteRecord()`
