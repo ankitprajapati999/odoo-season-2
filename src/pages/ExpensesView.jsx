@@ -122,6 +122,15 @@ export default function ExpensesView() {
   const maintTotal = expenses.filter(item => item.type === "Maintenance").reduce((sum, item) => sum + Number(item.amount), 0);
   const otherTotal = expenses.filter(item => ["Insurance", "Other"].includes(item.type)).reduce((sum, item) => sum + Number(item.amount), 0);
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-4">
+        <img src="/favicon.png" className="w-12 h-12 animate-spin drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" alt="Loading" />
+        <span className="text-xs font-semibold uppercase tracking-wider">Loading expenses...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Title */}

@@ -88,7 +88,7 @@ const getSidebarLinks = (role) => {
 function DashboardShell() {
   const supabase = useSupabase();
   const { user } = useUser();
-  
+
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -107,7 +107,7 @@ function DashboardShell() {
           const selectedRole = localStorage.getItem("selected_role") || "Fleet Manager";
           const dbRole = selectedRole === "Dispatcher" ? "Driver" : selectedRole;
           const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "";
-          
+
           const newProfile = {
             id: user.id,
             email: userEmail,
@@ -173,7 +173,7 @@ function DashboardShell() {
   if (!supabase || loadingProfile) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 gap-4">
-        <Activity className="w-8 h-8 text-amber-500 animate-spin" />
+        <img src="/favicon.png" className="w-12 h-12 animate-spin drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" alt="Loading" />
         <span className="text-xs font-semibold uppercase tracking-wider">Syncing Fleet profile...</span>
       </div>
     );
@@ -188,9 +188,7 @@ function DashboardShell() {
       <aside className="w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col justify-between p-5 select-none shrink-0">
         <div className="space-y-6">
           <div className="flex items-center gap-2 px-1">
-            <div className="bg-amber-500 p-2 rounded-xl text-zinc-950">
-              <Truck className="w-5 h-5 stroke-[2.5]" />
-            </div>
+            <img src="/favicon.png" className="w-[72px] h-[72px] object-contain" alt="Logo" />
             <div>
               <h2 className="text-md font-bold tracking-tight text-white">TransitOps</h2>
               <p className="text-[9px] text-zinc-500 tracking-wider font-semibold uppercase">Platform Control</p>
@@ -205,11 +203,10 @@ function DashboardShell() {
                 <button
                   key={link.name}
                   onClick={() => setActiveTab(link.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-zinc-900 text-amber-500 border-l-[3px] border-amber-500 rounded-l-none"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-900/50"
-                  }`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${isActive
+                    ? "bg-zinc-900 text-amber-500 border-l-[3px] border-amber-500 rounded-l-none"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900/50"
+                    }`}
                 >
                   <LinkIcon className={`w-4 h-4 ${isActive ? "text-amber-500" : "text-zinc-500"}`} />
                   {link.name}
@@ -284,7 +281,7 @@ export default function App() {
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 gap-4">
-        <Activity className="w-8 h-8 text-amber-500 animate-spin" />
+        <img src="/favicon.png" className="w-12 h-12 animate-spin drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" alt="Loading" />
         <span className="text-xs font-semibold uppercase tracking-wider">Syncing secure node...</span>
       </div>
     );
@@ -294,14 +291,12 @@ export default function App() {
     return (
       <div className="dark min-h-screen bg-zinc-950 text-zinc-100 flex flex-col antialiased">
         <div className="flex min-h-screen flex-col lg:flex-row bg-zinc-950 font-sans">
-          
+
           {/* Left Hero Column */}
           <div className="flex-1 flex flex-col justify-between p-8 lg:p-16 bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 border-r border-zinc-900">
             {/* Logo */}
             <div className="flex items-center gap-2">
-              <div className="bg-amber-500 p-2 rounded-xl text-zinc-950">
-                <Truck className="w-6 h-6 stroke-[2.5]" />
-              </div>
+              <img src="/favicon.png" className="w-[92px] h-[92px] object-contain" alt="Logo" />
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-white">TransitOps</h1>
                 <p className="text-[10px] text-amber-500 uppercase tracking-widest font-semibold">Fleet OS v2.0</p>
@@ -347,7 +342,7 @@ export default function App() {
           {/* Right Login Card Column */}
           <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950">
             <div className="w-full max-w-sm p-8 border rounded-2xl bg-zinc-900/60 border-zinc-850 backdrop-blur-md space-y-6 shadow-2xl shadow-black/60">
-              
+
               {!isSigningUp ? (
                 /* SIGN IN VIEW (No dropdown) */
                 <div className="space-y-6">

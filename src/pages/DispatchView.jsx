@@ -152,6 +152,15 @@ export default function DispatchView() {
 
   const activeTrips = trips.filter(t => t.status === "Active" || t.status === "Delayed");
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-4">
+        <img src="/favicon.png" className="w-12 h-12 animate-spin drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" alt="Loading" />
+        <span className="text-xs font-semibold uppercase tracking-wider">Loading dispatcher...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Title */}
