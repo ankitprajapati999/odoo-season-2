@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   SignInButton,
+  SignUpButton,
   UserButton,
   useUser,
   useAuth
@@ -323,43 +324,22 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Role Selector List */}
+              {/* Bullet Features */}
               <div className="space-y-3 pt-6 border-t border-zinc-900">
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-500">Select login for role:</p>
-                <div className="space-y-2">
-                  {[
-                    { name: "Fleet Manager", desc: "Vehicles registry, driver profiles, and full analytics" },
-                    { name: "Dispatcher", desc: "Trips dispatch control, scheduling, and tracking" },
-                    { name: "Safety Officer", desc: "Driver safety scores, license checks, and maintenance" },
-                    { name: "Financial Analyst", desc: "Fuel logs, operational expenses, and custom reports" }
-                  ].map((r) => {
-                    const isSelected = signupRole === r.name;
-                    return (
-                      <div
-                        key={r.name}
-                        onClick={() => {
-                          setSignupRole(r.name);
-                          localStorage.setItem("selected_role", r.name);
-                        }}
-                        className={`p-3.5 border rounded-xl bg-zinc-900/40 cursor-pointer transition-all hover:bg-zinc-900/80 flex items-center justify-between select-none ${
-                          isSelected 
-                            ? "border-amber-500 bg-zinc-900 shadow-md shadow-amber-500/5" 
-                            : "border-zinc-850"
-                        }`}
-                      >
-                        <div>
-                          <p className={`text-xs font-semibold ${isSelected ? "text-amber-500" : "text-zinc-200"}`}>{r.name}</p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">{r.desc}</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          isSelected ? "border-amber-500 bg-amber-500" : "border-zinc-700"
-                        }`}>
-                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-zinc-950" />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                {[
+                  { text: "Live dispatch & route monitoring", desc: "Track delays, delivery status, and scheduling" },
+                  { text: "Driver safety profiles", desc: "Monitor safety scores, phone contacts, and logs" },
+                  { text: "Maintenance logs & expenses", desc: "Calculate fuel efficiency, tolls, and repair costs" },
+                  { text: "Reports & analytics charts", desc: "Visualize fleet utilization and operational costs" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-zinc-200">{item.text}</p>
+                      <p className="text-[10px] text-zinc-500">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -373,24 +353,54 @@ export default function App() {
           <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950">
             <div className="w-full max-w-sm p-8 border rounded-2xl bg-zinc-900/60 border-zinc-850 backdrop-blur-md space-y-6 shadow-2xl shadow-black/60">
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold tracking-tight text-white">Welcome back</h3>
-                <p className="text-xs text-zinc-400">Please sign in to access your dashboard.</p>
+                <h3 className="text-2xl font-bold tracking-tight text-white">Console Portal</h3>
+                <p className="text-xs text-zinc-400">Select your active role to access your dashboard.</p>
+              </div>
+
+              {/* Dropdown Role Selector */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-xs font-semibold text-zinc-400">Select Role</label>
+                <select
+                  value={signupRole}
+                  onChange={(e) => {
+                    setSignupRole(e.target.value);
+                    localStorage.setItem("selected_role", e.target.value);
+                  }}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="Fleet Manager">Fleet Manager</option>
+                  <option value="Dispatcher">Dispatcher</option>
+                  <option value="Safety Officer">Safety Officer</option>
+                  <option value="Financial Analyst">Financial Analyst</option>
+                </select>
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3 pt-2">
                 <SignInButton mode="modal">
-                  <button className="w-full py-3 text-xs font-bold text-zinc-950 bg-amber-500 rounded-xl hover:bg-amber-450 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-amber-500/10">
-                    Sign In to Console
+                  <button className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-amber-500/20">
+                    Sign In
                   </button>
                 </SignInButton>
+
+                <div className="flex items-center gap-2.5 my-3.5">
+                  <hr className="flex-1 border-zinc-800" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-650">or</span>
+                  <hr className="flex-1 border-zinc-800" />
+                </div>
+
+                <SignUpButton mode="modal">
+                  <button className="w-full py-2.5 text-xs font-bold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 active:scale-[0.98] transition-all cursor-pointer">
+                    Sign Up
+                  </button>
+                </SignUpButton>
               </div>
 
               {/* RLS notice */}
               <div className="p-3 border rounded-lg bg-zinc-950/40 border-zinc-850 flex items-start gap-2.5">
                 <Shield className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-zinc-500 leading-relaxed">
-                  Your session is encrypted via Clerk JWT and protected by PostgreSQL Row Level Security (RLS) policies.
+                <p className="text-[10px] text-zinc-550 leading-relaxed">
+                  Your session is protected by Clerk and PostgreSQL Row Level Security (RLS) policies.
                 </p>
               </div>
             </div>
