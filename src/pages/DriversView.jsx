@@ -310,7 +310,7 @@ export default function DriversView({ role }) {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">License Expiry Date *</label>
-                  <input required type="date" value={formData.license_expiry_date} onChange={e => setFormData({...formData, license_expiry_date: e.target.value})}
+                  <input required type="date" min={new Date().toISOString().split("T")[0]} value={formData.license_expiry_date} onChange={e => setFormData({...formData, license_expiry_date: e.target.value})}
                     className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
                 </div>
               </div>

@@ -167,7 +167,7 @@ export default function ExpensesView({ role }) {
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-zinc-400 font-medium">Date</label>
-                <input type="date" required value={expenseDate} onChange={e => setExpenseDate(e.target.value)}
+                <input type="date" required max={new Date().toISOString().split("T")[0]} min={new Date(Date.now() - 90*24*60*60*1000).toISOString().split("T")[0]} value={expenseDate} onChange={e => setExpenseDate(e.target.value)}
                   className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
               </div>
               <button type="submit" disabled={vehicles.length === 0}
@@ -274,7 +274,7 @@ export default function ExpensesView({ role }) {
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-zinc-400 font-medium">Date</label>
-                <input type="date" required value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})}
+                <input type="date" required max={new Date().toISOString().split("T")[0]} min={new Date(Date.now() - 90*24*60*60*1000).toISOString().split("T")[0]} value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})}
                   className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
               </div>
               <div className="flex justify-end gap-3 pt-2">

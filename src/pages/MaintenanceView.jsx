@@ -157,7 +157,7 @@ export default function MaintenanceView({ role }) {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">Start Date</label>
-                  <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)}
+                  <input type="date" required max={new Date().toISOString().split("T")[0]} min={new Date(Date.now() - 90*24*60*60*1000).toISOString().split("T")[0]} value={startDate} onChange={e => setStartDate(e.target.value)}
                     className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
                 </div>
               </div>
@@ -300,12 +300,12 @@ export default function MaintenanceView({ role }) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">Start Date</label>
-                  <input type="date" required value={editForm.start_date} onChange={e => setEditForm({...editForm, start_date: e.target.value})}
+                  <input type="date" required max={new Date().toISOString().split("T")[0]} min={new Date(Date.now() - 90*24*60*60*1000).toISOString().split("T")[0]} value={editForm.start_date} onChange={e => setEditForm({...editForm, start_date: e.target.value})}
                     className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">End Date (optional)</label>
-                  <input type="date" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})}
+                  <input type="date" min={editForm.start_date || ""} max={new Date().toISOString().split("T")[0]} value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})}
                     className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>
               </div>
