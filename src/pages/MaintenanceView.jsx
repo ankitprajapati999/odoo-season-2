@@ -218,15 +218,15 @@ export default function MaintenanceView({ role }) {
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium tracking-wide ${statusBadge}`}>{ticket.status}</span>
                       {isWriteAllowed && (
-                        <div className="relative">
+                        <div className={`relative ${activeDropdown === ticket.id ? "z-30" : ""}`}>
                           <button onClick={() => setActiveDropdown(activeDropdown === ticket.id ? null : ticket.id)}
                             className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
                             <MoreVertical className="w-4 h-4" />
                           </button>
                           {activeDropdown === ticket.id && (
                             <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
-                              <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                              <div className="fixed inset-0 z-40" onClick={() => setActiveDropdown(null)} />
+                              <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 py-1 text-left">
                                 {ticket.status === "Active" && (
                                   <button onClick={() => handleCloseTicket(ticket)}
                                     className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">

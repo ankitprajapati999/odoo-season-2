@@ -175,16 +175,16 @@ export default function TripsView({ role }) {
                         {trip.status}
                       </span>
                     </td>
-                    {isWriteAllowed && (
-                      <td className="py-4 px-4 text-center relative">
+                     {isWriteAllowed && (
+                      <td className={`py-4 px-4 text-center relative ${activeDropdown === trip.id ? "z-30" : ""}`}>
                         <button onClick={() => setActiveDropdown(activeDropdown === trip.id ? null : trip.id)}
                           className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {activeDropdown === trip.id && (
                           <>
-                            <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
-                            <div className="absolute right-4 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                            <div className="fixed inset-0 z-40" onClick={() => setActiveDropdown(null)} />
+                            <div className="absolute right-4 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 py-1 text-left">
                               <button onClick={() => handleOpenEdit(trip)}
                                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                 <Edit className="w-3.5 h-3.5 text-zinc-500" /><span>Edit</span>

@@ -204,15 +204,15 @@ export default function ExpensesView({ role }) {
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white">${Number(expense.amount).toFixed(2)}</span>
                     {isWriteAllowed && (
-                      <div className="relative">
+                      <div className={`relative ${activeDropdown === expense.id ? "z-30" : ""}`}>
                         <button onClick={() => setActiveDropdown(activeDropdown === expense.id ? null : expense.id)}
                           className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {activeDropdown === expense.id && (
                           <>
-                            <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
-                            <div className="absolute right-0 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                            <div className="fixed inset-0 z-40" onClick={() => setActiveDropdown(null)} />
+                            <div className="absolute right-0 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 py-1 text-left">
                               <button onClick={() => handleOpenEdit(expense)}
                                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                 <Edit className="w-3.5 h-3.5 text-zinc-500" /><span>Edit</span>
