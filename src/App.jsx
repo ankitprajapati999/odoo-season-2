@@ -146,7 +146,11 @@ function DashboardShell() {
 
   const renderActiveView = () => {
     const role = profile?.role;
-    switch (activeTab) {
+    const allowedLinks = getSidebarLinks(role);
+    const isAllowed = allowedLinks.some(link => link.name === activeTab);
+    const actualTab = isAllowed ? activeTab : (allowedLinks[0]?.name || "Dashboard");
+
+    switch (actualTab) {
       case "Dashboard":
         return <DashboardView role={role} />;
       case "Vehicles":

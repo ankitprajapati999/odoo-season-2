@@ -1,457 +1,306 @@
 import React, { useState, useEffect } from "react";
-import { DollarSign, Plus, Flame, AlertCircle, TrendingDown, MoreVertical, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { DollarSign, Flame, MoreVertical, Edit, Trash2, AlertTriangle } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
 
-export default function ExpensesView() {
+const EXPENSE_TYPES = ["Fuel", "Tolls", "Maintenance", "Permit", "Other"];
+
+export default function ExpensesView({ role }) {
   const supabase = useSupabase();
   const [expenses, setExpenses] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Form State
   const [selectedVehicle, setSelectedVehicle] = useState("");
   const [expenseType, setExpenseType] = useState("Fuel");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
   const [statusMsg, setStatusMsg] = useState("");
 
-  // Meatballs Dropdown & Modal States
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  const [editForm, setEditForm] = useState({ vehicle_id: "", type: "Fuel", amount: "", description: "", date: "" });
 
-  const [editForm, setEditForm] = useState({
-    vehicle_id: "",
-    type: "Fuel",
-    amount: "",
-    description: ""
-  });
+  const isWriteAllowed = role === "Fleet Manager" || role === "Financial Analyst";
+
+  async function reload() {
+    const [e, v] = await Promise.all([
+      fleetService.getExpenses(supabase),
+      fleetService.getVehicles(supabase)
+    ]);
+    setExpenses(e || []); setVehicles(v || []);
+    if (v && v.length > 0 && !selectedVehicle) setSelectedVehicle(v[0].id);
+  }
 
   useEffect(() => {
-    async function loadData() {
-      const e = await fleetService.getExpenses(supabase);
-      const v = await fleetService.getVehicles(supabase);
-      setExpenses(e);
-      setVehicles(v);
-
-      if (v.length > 0) setSelectedVehicle(v[0].id);
-      setLoading(false);
-    }
-    loadData();
+    async function init() { await reload(); setLoading(false); }
+    init();
   }, [supabase]);
+
+  const showMsg = (msg) => { setStatusMsg(msg); setTimeout(() => setStatusMsg(""), 3500); };
 
   const handleOpenEdit = (expense) => {
     setSelectedExpense(expense);
-    setEditForm({
-      vehicle_id: expense.vehicle_id,
-      type: expense.type,
-      amount: expense.amount,
-      description: expense.description
-    });
-    setIsEditOpen(true);
+    setEditForm({ vehicle_id: expense.vehicle_id, type: expense.type, amount: expense.amount, description: expense.description, date: expense.date || "" });
+    setIsEditOpen(true); setActiveDropdown(null);
   };
 
   const handleSaveExpense = async (e) => {
     e.preventDefault();
     if (!selectedExpense) return;
-
-    const updates = {
-      vehicle_id: editForm.vehicle_id,
-      type: editForm.type,
-      amount: parseFloat(editForm.amount) || 0.0,
-      description: editForm.description
-    };
-
-    const result = await fleetService.updateExpense(supabase, selectedExpense.id, updates);
-    if (result) {
-      const data = await fleetService.getExpenses(supabase);
-      setExpenses(data);
-      setIsEditOpen(false);
-      setSelectedExpense(null);
-      setStatusMsg("💵 Expense record updated!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
+    try {
+      await fleetService.updateExpense(supabase, selectedExpense.id, {
+        vehicle_id: editForm.vehicle_id, type: editForm.type,
+        amount: parseFloat(editForm.amount) || 0.0,
+        description: editForm.description,
+        date: editForm.date || new Date().toISOString().split("T")[0]
+      });
+      await reload(); setIsEditOpen(false); setSelectedExpense(null);
+      showMsg("💵 Expense record updated!");
+    } catch (err) { showMsg(`❌ Error: ${err.message}`); }
   };
 
   const handleConfirmDelete = async () => {
     if (!selectedExpense) return;
-    const result = await fleetService.deleteExpense(supabase, selectedExpense.id);
-    if (result) {
-      const data = await fleetService.getExpenses(supabase);
-      setExpenses(data);
-      setIsDeleteOpen(false);
-      setSelectedExpense(null);
-      setStatusMsg("🗑️ Expense record deleted!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
+    try {
+      await fleetService.deleteExpense(supabase, selectedExpense.id);
+      await reload(); setIsDeleteOpen(false); setSelectedExpense(null);
+      showMsg("🗑️ Expense record deleted!");
+    } catch (err) { showMsg(`❌ Error: ${err.message}`); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedVehicle || !amount) {
-      setStatusMsg("❌ Please fill in all fields.");
-      return;
-    }
-
-    const newExpense = {
-      id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
-      vehicle_id: selectedVehicle,
-      type: expenseType,
-      amount: parseFloat(amount) || 0.0,
-      description: description || `${expenseType} cost`,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    const result = await fleetService.createExpense(supabase, newExpense);
-    if (result) {
-      const updatedExpenses = await fleetService.getExpenses(supabase);
-      setExpenses(updatedExpenses);
-      setAmount("");
-      setDescription("");
-      setStatusMsg("💵 Expense logged successfully!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
+    if (!selectedVehicle || !amount) { showMsg("❌ Please fill in all fields."); return; }
+    try {
+      await fleetService.createExpense(supabase, {
+        vehicle_id: selectedVehicle, type: expenseType,
+        amount: parseFloat(amount) || 0.0,
+        description: description || `${expenseType} expense`,
+        date: expenseDate
+      });
+      await reload(); setAmount(""); setDescription("");
+      setExpenseDate(new Date().toISOString().split("T")[0]);
+      showMsg("💵 Expense logged successfully!");
+    } catch (err) { showMsg(`❌ Error: ${err.message}`); }
   };
 
-  // Grouped Totals
   const totalAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
-  const fuelTotal = expenses.filter(item => item.type === "Fuel").reduce((sum, item) => sum + Number(item.amount), 0);
-  const tollsTotal = expenses.filter(item => item.type === "Tolls").reduce((sum, item) => sum + Number(item.amount), 0);
-  const maintTotal = expenses.filter(item => item.type === "Maintenance").reduce((sum, item) => sum + Number(item.amount), 0);
-  const otherTotal = expenses.filter(item => ["Insurance", "Other"].includes(item.type)).reduce((sum, item) => sum + Number(item.amount), 0);
+  const fuelTotal = expenses.filter(i => i.type === "Fuel").reduce((sum, i) => sum + Number(i.amount), 0);
+  const tollsTotal = expenses.filter(i => i.type === "Tolls").reduce((sum, i) => sum + Number(i.amount), 0);
+  const maintTotal = expenses.filter(i => i.type === "Maintenance").reduce((sum, i) => sum + Number(i.amount), 0);
+  const otherTotal = expenses.filter(i => ["Permit", "Other"].includes(i.type)).reduce((sum, i) => sum + Number(i.amount), 0);
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-white">Fuel & Expense Management</h1>
-        <p className="text-sm text-zinc-400">Track diesel refills, toll expenses, and maintenance payouts.</p>
+        <p className="text-sm text-zinc-400">Track diesel refills, toll expenses, permit fees, and maintenance payouts.</p>
       </div>
 
-      {/* Expense Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {/* Total Outflow */}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80 backdrop-blur-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Outflow</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Spend</div>
           <div className="mt-2 text-2xl font-bold text-white">${totalAmount.toFixed(2)}</div>
         </div>
-
-        {/* Fuel Costs */}
         <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80 backdrop-blur-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
             <Flame className="w-3.5 h-3.5 text-amber-500" /> Fuel Total
           </div>
           <div className="mt-2 text-2xl font-bold text-white">${fuelTotal.toFixed(2)}</div>
         </div>
-
-        {/* Tolls */}
         <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80 backdrop-blur-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Tolls & Fees</div>
           <div className="mt-2 text-2xl font-bold text-white">${tollsTotal.toFixed(2)}</div>
         </div>
-
-        {/* Maintenance */}
-        <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80 backdrop-blur-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Maintenance Bills</div>
-          <div className="mt-2 text-2xl font-bold text-white">${maintTotal.toFixed(2)}</div>
-        </div>
-
-        {/* Miscellaneous */}
         <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80 backdrop-blur-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Miscellaneous</div>
-          <div className="mt-2 text-2xl font-bold text-white">${otherTotal.toFixed(2)}</div>
+          <div className="mt-2 text-2xl font-bold text-white">${(maintTotal + otherTotal).toFixed(2)}</div>
         </div>
       </div>
 
+      {statusMsg && (
+        <div className="px-4 py-2 text-xs font-semibold text-center rounded-lg border bg-zinc-900 border-zinc-800 text-zinc-200">{statusMsg}</div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Expense Form (Left 1 Column) */}
+        {/* Expense Form */}
         <div className="lg:col-span-1 p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-amber-500" /> Record Expense
           </h3>
-          <p className="text-xs text-zinc-400">Submit a fuel purchase receipt or highway toll payment log.</p>
+          <p className="text-xs text-zinc-400">Submit a fuel receipt or highway toll payment log.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Select Vehicle</label>
-              <select
-                value={selectedVehicle}
-                onChange={(e) => setSelectedVehicle(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-              >
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>{v.id} - {v.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Expense Category</label>
-                <select
-                  value={expenseType}
-                  onChange={(e) => setExpenseType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                >
-                  <option value="Fuel">Fuel</option>
-                  <option value="Tolls">Tolls</option>
-                  <option value="Maintenance">Maintenance</option>
-                  <option value="Insurance">Insurance</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Total Amount ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="85.50"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-650"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Expense Description</label>
-              <input
-                type="text"
-                placeholder="Full unleaded tank refuel"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-650"
-              />
-            </div>
-
-            {statusMsg && (
-              <div className="p-3 rounded-lg text-xs font-semibold bg-zinc-950 border border-zinc-850 text-center">
-                {statusMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-98 transition-all cursor-pointer shadow-md shadow-amber-500/20"
-            >
-              Log Expense
-            </button>
-          </form>
-        </div>
-
-        {/* Expenses List (Right 2 Columns) */}
-        <div className="lg:col-span-2 p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
-          <h3 className="text-lg font-bold text-white">Expense Records</h3>
-          <p className="text-xs text-zinc-400">Audit listing of financial transactions for the active fleet.</p>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-zinc-850 text-xs text-zinc-400 font-semibold bg-zinc-950/20">
-                  <th className="py-3 px-4">Expense ID</th>
-                  <th className="py-3 px-4">Vehicle</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Description</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4 w-12 text-center"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-850 text-xs text-zinc-300">
-                {expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-zinc-850/40 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-medium text-white">{exp.id}</td>
-                    <td className="py-3.5 px-4 font-mono text-zinc-350">{exp.vehicle_id}</td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        exp.type === "Fuel" 
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" 
-                          : exp.type === "Maintenance" 
-                            ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                            : "bg-zinc-700/20 text-zinc-300 border border-zinc-700/30"
-                      }`}>
-                        {exp.type}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 max-w-[150px] truncate" title={exp.description}>{exp.description}</td>
-                    <td className="py-3.5 px-4">{exp.date}</td>
-                    <td className="py-3.5 px-4 font-mono font-semibold text-white">${Number(exp.amount).toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center relative">
-                      <button
-                        onClick={() => setActiveDropdown(activeDropdown === exp.id ? null : exp.id)}
-                        className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {activeDropdown === exp.id && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-10" 
-                            onClick={() => setActiveDropdown(null)} 
-                          />
-                          <div className="absolute right-4 mt-2 w-28 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
-                            <button
-                              onClick={() => {
-                                handleOpenEdit(exp);
-                                setActiveDropdown(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <Edit className="w-3.5 h-3.5 text-zinc-500" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedExpense(exp);
-                                setIsDeleteOpen(true);
-                                setActiveDropdown(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 hover:text-rose-300 flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {expenses.length === 0 && !loading && (
-                  <tr>
-                    <td colSpan="7" className="py-8 text-center text-zinc-500">
-                      No expenses logged.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Edit Expense Modal */}
-      {isEditOpen && selectedExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Edit Expense Record</h3>
-              <button
-                onClick={() => setIsEditOpen(false)}
-                className="text-zinc-400 hover:text-white font-semibold text-lg cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveExpense} className="space-y-4">
+          {isWriteAllowed ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs text-zinc-400 font-medium">Select Vehicle</label>
-                <select
-                  value={editForm.vehicle_id}
-                  onChange={(e) => setEditForm({ ...editForm, vehicle_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.id} - {v.name}</option>
-                  ))}
+                <select value={selectedVehicle} onChange={e => setSelectedVehicle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer">
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration_number} — {v.name}</option>)}
+                  {vehicles.length === 0 && <option value="">No vehicles found</option>}
                 </select>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">Expense Category</label>
-                  <select
-                    value={editForm.type}
-                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="Fuel">Fuel</option>
-                    <option value="Tolls">Tolls</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Insurance">Insurance</option>
-                    <option value="Other">Other</option>
+                  <select value={expenseType} onChange={e => setExpenseType(e.target.value)}
+                    className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer">
+                    {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-xs text-zinc-400 font-medium">Total Amount ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editForm.amount}
-                    onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  />
+                  <input type="number" step="0.01" required placeholder="85.50" value={amount} onChange={e => setAmount(e.target.value)}
+                    className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-650" />
                 </div>
               </div>
-
               <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Expense Description</label>
-                <input
-                  type="text"
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
+                <label className="text-xs text-zinc-400 font-medium">Description (optional)</label>
+                <input type="text" placeholder="Highway I-45 toll pass" value={description} onChange={e => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-650" />
               </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Date</label>
+                <input type="date" required value={expenseDate} onChange={e => setExpenseDate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
+              </div>
+              <button type="submit" disabled={vehicles.length === 0}
+                className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-amber-500/20">
+                Log Expense
+              </button>
+            </form>
+          ) : (
+            <div className="py-8 text-center text-zinc-500 text-xs space-y-2">
+              <AlertTriangle className="w-8 h-8 mx-auto text-zinc-600" />
+              <p>Only Fleet Managers and Financial Analysts can log expenses.</p>
+            </div>
+          )}
+        </div>
 
-              <div className="pt-3 flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsEditOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition cursor-pointer shadow-md shadow-amber-500/20"
-                >
-                  Save Changes
-                </button>
+        {/* Expense Logs */}
+        <div className="lg:col-span-2 p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
+          <h3 className="text-lg font-bold text-white">Expense Logs</h3>
+          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+            {expenses.map(expense => {
+              const vehicle = vehicles.find(v => v.id === expense.vehicle_id);
+              return (
+                <div key={expense.id} className="p-3 border rounded-xl bg-zinc-950/60 border-zinc-850 hover:border-zinc-800 transition-all flex items-center justify-between gap-3">
+                  <div className="flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">{expense.type}</span>
+                      <span className="text-xs font-medium text-white">{expense.description}</span>
+                    </div>
+                    <div className="flex gap-3 text-[10px] text-zinc-500 font-mono">
+                      <span>{vehicle?.registration_number || "Unknown"}</span>
+                      <span>{expense.date}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-white">${Number(expense.amount).toFixed(2)}</span>
+                    {isWriteAllowed && (
+                      <div className="relative">
+                        <button onClick={() => setActiveDropdown(activeDropdown === expense.id ? null : expense.id)}
+                          className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {activeDropdown === expense.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                            <div className="absolute right-0 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
+                              <button onClick={() => handleOpenEdit(expense)}
+                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
+                                <Edit className="w-3.5 h-3.5 text-zinc-500" /><span>Edit</span>
+                              </button>
+                              <button onClick={() => { setSelectedExpense(expense); setIsDeleteOpen(true); setActiveDropdown(null); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500/80" /><span>Delete</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {expenses.length === 0 && !loading && (
+              <div className="py-10 text-center text-zinc-500 text-xs">No expenses logged yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {isEditOpen && selectedExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Edit Expense</h3>
+              <button onClick={() => setIsEditOpen(false)} className="text-zinc-400 hover:text-white text-xl cursor-pointer">&times;</button>
+            </div>
+            <form onSubmit={handleSaveExpense} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Vehicle</label>
+                <select value={editForm.vehicle_id} onChange={e => setEditForm({...editForm, vehicle_id: e.target.value})}
+                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration_number} — {v.name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-medium">Type</label>
+                  <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})}
+                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-medium">Amount ($)</label>
+                  <input type="number" step="0.01" min="0" required value={editForm.amount} onChange={e => setEditForm({...editForm, amount: e.target.value})}
+                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Description</label>
+                <input type="text" value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})}
+                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Date</label>
+                <input type="date" required value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})}
+                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setIsEditOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer">Cancel</button>
+                <button type="submit"
+                  className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition cursor-pointer">Save</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation */}
       {isDeleteOpen && selectedExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
           <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl text-center space-y-4">
             <div className="h-12 w-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
               <AlertTriangle className="h-6 w-6" />
             </div>
-
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">Delete Expense Record</h3>
-              <p className="text-sm text-zinc-400">
-                Are you sure you want to delete expense record <strong>{selectedExpense.id}</strong>? This action is permanent.
-              </p>
-            </div>
-
+            <h3 className="text-lg font-bold text-white">Delete Expense</h3>
+            <p className="text-sm text-zinc-400">Permanently remove this expense record?</p>
             <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={() => setIsDeleteOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-              >
-                Keep Record
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer shadow-md shadow-rose-600/20"
-              >
-                Delete
-              </button>
+              <button onClick={() => setIsDeleteOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer">Keep</button>
+              <button onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer">Delete</button>
             </div>
           </div>
         </div>

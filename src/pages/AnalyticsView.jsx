@@ -1,237 +1,290 @@
-import React, { useState } from "react";
-import { BarChart3, TrendingUp, DollarSign, ShieldCheck, Flame, PieChart } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { BarChart3, TrendingUp, DollarSign, ShieldCheck, Flame, Download, Truck } from "lucide-react";
+import fleetService from "../services/fleetService";
+import { useSupabase } from "../auth/supabase";
 
-export default function AnalyticsView() {
-  const [timeframe, setTimeframe] = useState("Month");
+export default function AnalyticsView({ role }) {
+  const supabase = useSupabase();
+  const [loading, setLoading] = useState(true);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [fuelLogs, setFuelLogs] = useState([]);
+  const [maintenance, setMaintenance] = useState([]);
 
-  // Mock data for analytics
-  const fuelData = [
-    { name: "VEH-001", efficiency: 6.2 },
-    { name: "VEH-002", efficiency: 11.5 },
-    { name: "VEH-003", efficiency: 8.0 },
-    { name: "VEH-004", efficiency: 22.0 },
-    { name: "VEH-005", efficiency: 7.1 },
-    { name: "VEH-006", efficiency: 10.2 },
+  useEffect(() => {
+    async function loadAll() {
+      const [v, d, t, e, f, m] = await Promise.all([
+        fleetService.getVehicles(supabase),
+        fleetService.getDrivers(supabase),
+        fleetService.getTrips(supabase),
+        fleetService.getExpenses(supabase),
+        fleetService.getFuelLogs(supabase),
+        fleetService.getMaintenance(supabase)
+      ]);
+      setVehicles(v || []); setDrivers(d || []); setTrips(t || []);
+      setExpenses(e || []); setFuelLogs(f || []); setMaintenance(m || []);
+      setLoading(false);
+    }
+    loadAll();
+  }, [supabase]);
+
+  // ── Derived Analytics ──────────────────────────────────────────────────────
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalMaintCost = maintenance.reduce((sum, m) => sum + Number(m.cost), 0);
+  const totalFuelCost = fuelLogs.reduce((sum, f) => sum + Number(f.cost), 0);
+  const grandTotal = totalFuelCost + totalMaintCost + totalExpenses;
+
+  const costCategories = [
+    { label: "Fuel (Logs)", amount: totalFuelCost, color: "bg-amber-500", text: "text-amber-400" },
+    { label: "Maintenance", amount: totalMaintCost, color: "bg-rose-500", text: "text-rose-400" },
+    { label: "Expenses", amount: totalExpenses, color: "bg-blue-500", text: "text-blue-400" }
   ];
 
-  const costBreakdown = [
-    { category: "Fuel", amount: 1540.50, color: "bg-amber-500" },
-    { category: "Maintenance", amount: 1350.00, color: "bg-blue-500" },
-    { category: "Tolls", amount: 125.00, color: "bg-cyan-500" },
-    { category: "Insurance", amount: 800.00, color: "bg-rose-500" },
-    { category: "Other", amount: 95.00, color: "bg-zinc-500" },
-  ];
+  const activeVehicles = vehicles.filter(v => v.status !== "Retired");
+  const onTripCount = vehicles.filter(v => v.status === "On Trip").length;
+  const utilization = activeVehicles.length > 0 ? Math.round((onTripCount / activeVehicles.length) * 100) : 0;
 
-  const utilizationTrend = [
-    { day: "Mon", rate: 82 },
-    { day: "Tue", rate: 85 },
-    { day: "Wed", rate: 87 },
-    { day: "Thu", rate: 84 },
-    { day: "Fri", rate: 90 },
-    { day: "Sat", rate: 76 },
-    { day: "Sun", rate: 70 },
-  ];
+  const completedTrips = trips.filter(t => t.status === "Completed");
 
-  const safetyLeaderboard = [
-    { name: "Sarah Martinez", score: 98 },
-    { name: "Alex Johnson", score: 96 },
-    { name: "Elena Rostova", score: 95 },
-    { name: "Jordan Brooks", score: 91 },
-    { name: "David Kim", score: 89 },
-  ];
+  const tripStatusCounts = {
+    Draft: trips.filter(t => t.status === "Draft").length,
+    Dispatched: trips.filter(t => t.status === "Dispatched").length,
+    Completed: trips.filter(t => t.status === "Completed").length,
+    Cancelled: trips.filter(t => t.status === "Cancelled").length
+  };
+  const maxTripCount = Math.max(...Object.values(tripStatusCounts), 1);
 
-  const totalCost = costBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const safetyLeaderboard = [...drivers].sort((a, b) => Number(b.safety_score) - Number(a.safety_score)).slice(0, 8);
+
+  const vehicleROI = vehicles.map(v => {
+    const vTrips = completedTrips.filter(t => t.vehicle_id === v.id);
+    const totalDistance = vTrips.reduce((sum, t) => sum + Number(t.actual_distance || t.planned_distance || 0), 0);
+    const vMaint = maintenance.filter(m => m.vehicle_id === v.id).reduce((sum, m) => sum + Number(m.cost), 0);
+    const vFuel = fuelLogs.filter(f => f.vehicle_id === v.id).reduce((sum, f) => sum + Number(f.cost), 0);
+    const vExp = expenses.filter(e => e.vehicle_id === v.id).reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalCost = vMaint + vFuel + vExp;
+    const roi = Number(v.acquisition_cost) > 0 ? (((totalDistance * 2) - totalCost) / Number(v.acquisition_cost) * 100) : 0;
+    return { ...v, tripsCount: vTrips.length, totalDistance: Math.round(totalDistance), totalCost: Math.round(totalCost), roi: roi.toFixed(1) };
+  }).sort((a, b) => b.tripsCount - a.tripsCount);
+
+  const handleExportCSV = () => {
+    const headers = ["Reg Number", "Name", "Type", "Status", "Trips", "Distance (km)", "Cost ($)", "ROI (%)"];
+    const rows = vehicleROI.map(v => [v.registration_number, v.name, v.type, v.status, v.tripsCount, v.totalDistance, v.totalCost, v.roi]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `fleet_analytics_${new Date().toISOString().split("T")[0]}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-zinc-400 text-sm">Loading analytics...</div>;
 
   return (
     <div className="space-y-6">
-      {/* Title & Action */}
+      {/* Title */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Reports & Analytics</h1>
-          <p className="text-sm text-zinc-400">Interactive trends, efficiency metrics, and safety score cards.</p>
+          <p className="text-sm text-zinc-400">Live fleet performance metrics, cost breakdowns, and safety scores.</p>
         </div>
-        <div className="flex bg-zinc-950 border border-zinc-850 rounded-lg p-0.5">
-          {["Week", "Month", "Year"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setTimeframe(t)}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                timeframe === t 
-                  ? "bg-amber-500 text-zinc-950" 
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        <button onClick={handleExportCSV}
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 hover:text-white transition-all cursor-pointer">
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </button>
+      </div>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Fleet Utilization</div>
+          <div className="mt-2 text-3xl font-bold text-amber-400">{utilization}%</div>
+          <div className="text-[10px] text-zinc-500 mt-1">{onTripCount} of {activeVehicles.length} active on trip</div>
+        </div>
+        <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Completed Trips</div>
+          <div className="mt-2 text-3xl font-bold text-emerald-400">{completedTrips.length}</div>
+          <div className="text-[10px] text-zinc-500 mt-1">{trips.length} total logged</div>
+        </div>
+        <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Fleet Cost</div>
+          <div className="mt-2 text-3xl font-bold text-rose-400">${grandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+          <div className="text-[10px] text-zinc-500 mt-1">Fuel + Maintenance + Expenses</div>
+        </div>
+        <div className="p-4 border rounded-xl bg-zinc-900/50 border-zinc-800/80">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Avg Safety Score</div>
+          <div className="mt-2 text-3xl font-bold text-blue-400">
+            {drivers.length > 0 ? (drivers.reduce((sum, d) => sum + Number(d.safety_score), 0) / drivers.length).toFixed(0) : "—"}
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-1">Across {drivers.length} drivers</div>
         </div>
       </div>
 
-      {/* Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Chart 1: Fuel Efficiency (Bar Chart) */}
+        {/* Trip Status Bar Chart */}
         <div className="p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Flame className="w-4 h-4 text-amber-500" /> Fuel Efficiency (km/l)
-            </h3>
-            <span className="text-xs text-zinc-400">Filtered by Vehicle</span>
-          </div>
-
-          {/* SVG Bar Chart */}
-          <div className="relative pt-4 h-48 w-full flex items-end justify-between border-b border-zinc-800">
-            {fuelData.map((d, index) => {
-              const maxVal = 25; // max scale
-              const heightPercent = (d.efficiency / maxVal) * 100;
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-amber-500" /> Trip Status Breakdown
+          </h3>
+          <div className="relative pt-2 h-48 w-full flex items-end justify-around gap-2 border-b border-zinc-800 pb-2">
+            {Object.entries(tripStatusCounts).map(([status, count]) => {
+              const heightPct = (count / maxTripCount) * 100;
+              const colors = { Draft: "bg-zinc-500", Dispatched: "bg-emerald-500", Completed: "bg-blue-500", Cancelled: "bg-rose-500" };
               return (
-                <div key={d.name} className="flex-1 flex flex-col items-center group cursor-pointer">
-                  <div className="relative w-8 bg-zinc-800 rounded-t-md overflow-hidden flex items-end h-32 group-hover:bg-zinc-700/60 transition-colors">
-                    <div 
-                      style={{ height: `${heightPercent}%` }} 
-                      className="w-full bg-amber-500 rounded-t-md group-hover:bg-amber-400 transition-all duration-500"
-                    />
-                    {/* Tooltip */}
-                    <div className="absolute opacity-0 group-hover:opacity-100 bottom-full mb-1 bg-zinc-950 text-white text-[10px] px-1.5 py-0.5 rounded border border-zinc-800 font-semibold pointer-events-none transition-all">
-                      {d.efficiency}
+                <div key={status} className="flex-1 flex flex-col items-center group cursor-pointer">
+                  <div className="relative w-10 bg-zinc-800 rounded-t-md overflow-hidden flex items-end h-32">
+                    <div style={{ height: `${Math.max(heightPct, count > 0 ? 5 : 0)}%` }}
+                      className={`w-full ${colors[status]} rounded-t-md transition-all duration-500`} />
+                    <div className="absolute opacity-0 group-hover:opacity-100 bottom-full mb-1 bg-zinc-950 text-white text-[10px] px-1.5 py-0.5 rounded border border-zinc-800 font-semibold pointer-events-none whitespace-nowrap">
+                      {count} trips
                     </div>
                   </div>
-                  <span className="text-[10px] text-zinc-500 mt-2 font-mono">{d.name}</span>
+                  <span className="text-[10px] text-zinc-500 mt-2">{status}</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Chart 2: Fleet Utilization Trend (Area Chart) */}
+        {/* Cost Breakdown */}
         <div className="p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-500" /> Fleet Utilization (%)
-            </h3>
-            <span className="text-xs text-zinc-400">Weekly Active Trend</span>
-          </div>
-
-          {/* SVG Line / Area Chart */}
-          <div className="h-48 w-full relative flex flex-col justify-end">
-            <svg viewBox="0 0 500 150" className="w-full h-36 overflow-visible">
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              {/* Grid Lines */}
-              <line x1="0" y1="30" x2="500" y2="30" stroke="#27272a" strokeWidth="0.5" strokeDasharray="4" />
-              <line x1="0" y1="75" x2="500" y2="75" stroke="#27272a" strokeWidth="0.5" strokeDasharray="4" />
-              <line x1="0" y1="120" x2="500" y2="120" stroke="#27272a" strokeWidth="0.5" strokeDasharray="4" />
-
-              {/* Area */}
-              <path
-                d="M 10 150 L 10 70 L 90 60 L 170 52 L 250 65 L 330 40 L 410 80 L 490 90 L 490 150 Z"
-                fill="url(#areaGrad)"
-              />
-              {/* Path Line */}
-              <path
-                d="M 10 70 L 90 60 L 170 52 L 250 65 L 330 40 L 410 80 L 490 90"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Data points */}
-              {[
-                {x: 10, y: 70}, {x: 90, y: 60}, {x: 170, y: 52},
-                {x: 250, y: 65}, {x: 330, y: 40}, {x: 410, y: 80}, {x: 490, y: 90}
-              ].map((pt, i) => (
-                <circle 
-                  key={i} 
-                  cx={pt.x} 
-                  cy={pt.y} 
-                  r="4" 
-                  fill="#10b981" 
-                  stroke="#18181b" 
-                  strokeWidth="1.5"
-                  className="cursor-pointer hover:r-6 transition-all"
-                />
-              ))}
-            </svg>
-            <div className="flex justify-between text-[10px] text-zinc-500 px-2 mt-2">
-              {utilizationTrend.map(d => <span key={d.day}>{d.day}</span>)}
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-amber-500" /> Cost Breakdown
+          </h3>
+          <div className="space-y-3">
+            {costCategories.map(cat => {
+              const pct = grandTotal > 0 ? ((cat.amount / grandTotal) * 100).toFixed(1) : 0;
+              return (
+                <div key={cat.label} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className={`font-medium ${cat.text}`}>{cat.label}</span>
+                    <span className="text-zinc-300 font-mono">${cat.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({pct}%)</span>
+                  </div>
+                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className={`h-full ${cat.color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div className="pt-2 border-t border-zinc-800 flex justify-between text-xs font-bold">
+              <span className="text-zinc-300">Grand Total</span>
+              <span className="text-white font-mono">${grandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             </div>
           </div>
         </div>
 
-        {/* Chart 3: Operational Cost breakdown (Donut / Visual Bar list) */}
+        {/* Safety Leaderboard */}
         <div className="p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-rose-500" /> Operational Cost Breakdown
-            </h3>
-            <span className="text-xs font-semibold text-zinc-300">Total: ${totalCost.toFixed(2)}</span>
-          </div>
-
-          <div className="space-y-3.5">
-            {costBreakdown.map((item) => {
-              const percentage = Math.round((item.amount / totalCost) * 100);
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-500" /> Driver Safety Leaderboard
+          </h3>
+          <div className="space-y-2.5">
+            {safetyLeaderboard.length === 0 && <p className="text-xs text-zinc-500 text-center py-4">No driver data yet.</p>}
+            {safetyLeaderboard.map((driver, i) => {
+              const scoreColor = driver.safety_score >= 90 ? "text-emerald-400" : driver.safety_score >= 80 ? "text-amber-400" : "text-rose-400";
+              const scoreBg = driver.safety_score >= 90 ? "bg-emerald-500/10 border-emerald-500/20" : driver.safety_score >= 80 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20";
               return (
-                <div key={item.category} className="space-y-1">
-                  <div className="flex justify-between text-xs text-zinc-300">
-                    <span className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-                      {item.category}
-                    </span>
-                    <span className="font-semibold">${item.amount.toFixed(2)} ({percentage}%)</span>
+                <div key={driver.id} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-5 text-xs font-bold ${i < 3 ? "text-amber-400" : "text-zinc-500"}`}>#{i + 1}</span>
+                    <div>
+                      <p className="text-xs font-medium text-white">{driver.name}</p>
+                      <p className="text-[10px] text-zinc-500">Class {driver.license_category} • {driver.status}</p>
+                    </div>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
-                    <div 
-                      style={{ width: `${percentage}%` }} 
-                      className={`h-full ${item.color} rounded-full`}
-                    />
-                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${scoreColor} ${scoreBg}`}>{driver.safety_score} pts</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Chart 4: Safety score Leaderboard */}
+        {/* Fleet Status Distribution */}
         <div className="p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Safety score Leaderboard
-            </h3>
-            <span className="text-xs text-zinc-400">Top Drivers</span>
-          </div>
-
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-amber-500" /> Fleet Status Distribution
+          </h3>
           <div className="space-y-3">
-            {safetyLeaderboard.map((d, index) => {
-              const maxScore = 100;
-              const barPercent = (d.score / maxScore) * 100;
+            {[
+              { label: "Available", color: "bg-emerald-500", textColor: "text-emerald-400" },
+              { label: "On Trip", color: "bg-blue-500", textColor: "text-blue-400" },
+              { label: "In Shop", color: "bg-rose-500", textColor: "text-rose-400" },
+              { label: "Retired", color: "bg-zinc-500", textColor: "text-zinc-400" }
+            ].map(({ label, color, textColor }) => {
+              const count = vehicles.filter(v => v.status === label).length;
+              const pct = vehicles.length > 0 ? ((count / vehicles.length) * 100).toFixed(1) : 0;
               return (
-                <div key={d.name} className="flex items-center gap-3">
-                  {/* Rank */}
-                  <span className="text-xs font-bold text-zinc-500 w-4">#{index + 1}</span>
-                  {/* Info */}
-                  <div className="flex-1 space-y-1">
-                    <div className="flex justify-between text-xs text-zinc-300">
-                      <span>{d.name}</span>
-                      <span className="font-semibold text-emerald-400">{d.score} pts</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                      <div 
-                        style={{ width: `${barPercent}%` }} 
-                        className="h-full bg-emerald-500 rounded-full"
-                      />
-                    </div>
+                <div key={label} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className={`font-medium ${textColor}`}>{label}</span>
+                    <span className="text-zinc-300 font-mono">{count} vehicles ({pct}%)</span>
+                  </div>
+                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+      </div>
 
+      {/* Vehicle ROI Table */}
+      <div className="p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <Truck className="w-4 h-4 text-amber-500" /> Vehicle Performance & ROI
+          </h3>
+          <span className="text-[10px] text-zinc-500">ROI = (Distance × 2 − Cost) / Acquisition Cost</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-800 text-xs text-zinc-400 font-semibold bg-zinc-950/20">
+                <th className="py-3 px-3">Vehicle</th>
+                <th className="py-3 px-3">Type</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Trips</th>
+                <th className="py-3 px-3">Distance (km)</th>
+                <th className="py-3 px-3">Total Cost ($)</th>
+                <th className="py-3 px-3">Acq. Cost ($)</th>
+                <th className="py-3 px-3">Est. ROI</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-850 text-xs text-zinc-300">
+              {vehicleROI.map(v => {
+                const roiColor = Number(v.roi) > 5 ? "text-emerald-400" : Number(v.roi) < 0 ? "text-rose-400" : "text-amber-400";
+                return (
+                  <tr key={v.id} className="hover:bg-zinc-850/40 transition-colors">
+                    <td className="py-3 px-3">
+                      <div className="font-medium text-white">{v.name}</div>
+                      <div className="font-mono text-[10px] text-zinc-500">{v.registration_number}</div>
+                    </td>
+                    <td className="py-3 px-3">{v.type}</td>
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        v.status === "Available" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                        v.status === "On Trip"   ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
+                        v.status === "In Shop"   ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
+                        "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                      }`}>{v.status}</span>
+                    </td>
+                    <td className="py-3 px-3 font-mono">{v.tripsCount}</td>
+                    <td className="py-3 px-3 font-mono">{v.totalDistance.toLocaleString()}</td>
+                    <td className="py-3 px-3 font-mono">${v.totalCost.toLocaleString()}</td>
+                    <td className="py-3 px-3 font-mono">${Number(v.acquisition_cost).toLocaleString()}</td>
+                    <td className={`py-3 px-3 font-mono font-bold ${roiColor}`}>{v.roi}%</td>
+                  </tr>
+                );
+              })}
+              {vehicleROI.length === 0 && (
+                <tr><td colSpan={8} className="py-8 text-center text-zinc-500">No vehicle data to analyze.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
