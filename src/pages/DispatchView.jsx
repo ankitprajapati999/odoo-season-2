@@ -1,156 +1,158 @@
 import React, { useState, useEffect } from "react";
-import { Send, MapPin, Truck, Users, Clock, AlertTriangle, MoreVertical, Edit, CheckCircle, Trash2 } from "lucide-react";
+import { Send, MapPin, Truck, Users, CheckCircle, MoreVertical, Edit, Trash2, AlertTriangle, XCircle } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
+import { useUser } from "@clerk/react";
 
-export default function DispatchView() {
+export default function DispatchView({ role }) {
   const supabase = useSupabase();
+  const { user } = useUser();
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [trips, setTrips] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   // Form State
-  const [route, setRoute] = useState("");
+  const [source, setSource] = useState("");
+  const [destination, setDestination] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState("");
   const [selectedDriver, setSelectedDriver] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState("North");
-
-  // Status message
+  const [cargoWeight, setCargoWeight] = useState("");
+  const [plannedDistance, setPlannedDistance] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
+  const [statusType, setStatusType] = useState("info");
 
-  // Meatballs Dropdown & Modal States
+  // Complete Trip Modal
+  const [isCompleteOpen, setIsCompleteOpen] = useState(false);
+  const [tripToComplete, setTripToComplete] = useState(null);
+  const [actualDistance, setActualDistance] = useState("");
+  const [fuelConsumed, setFuelConsumed] = useState("");
+
+  // Meatballs & Delete Modal
   const [activeDropdown, setActiveDropdown] = useState(null);
-  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
-  const [allVehicles, setAllVehicles] = useState([]);
-  const [allDrivers, setAllDrivers] = useState([]);
+  const [tripToDelete, setTripToDelete] = useState(null);
 
-  const [editForm, setEditForm] = useState({
-    route_name: "",
-    vehicle_id: "",
-    driver_id: "",
-    region: "North",
-    status: "Active"
+  // RLS: Fleet Manager + Driver can INSERT/UPDATE trips. Only Fleet Manager can DELETE.
+  const isWriteAllowed = role === "Fleet Manager" || role === "Driver";
+  const isDeleteAllowed = role === "Fleet Manager";
+
+  const showMsg = (msg, type = "info") => {
+    setStatusMsg(msg);
+    setStatusType(type);
+    setTimeout(() => setStatusMsg(""), 4000);
+  };
+
+  async function reload() {
+    const [v, d, t] = await Promise.all([
+      fleetService.getVehicles(supabase),
+      fleetService.getDrivers(supabase),
+      fleetService.getTrips(supabase)
+    ]);
+    setVehicles(v || []);
+    setDrivers(d || []);
+    setTrips(t || []);
+  }
+
+  useEffect(() => { if (!supabase) return; reload(); }, [supabase]);
+
+  // Only show available vehicles and drivers for dispatch form
+  const availableVehicles = vehicles.filter(v => v.status === "Available");
+  const availableDrivers = drivers.filter(d => {
+    if (d.status !== "Available") return false;
+    if (!d.license_expiry_date) return false;
+    return new Date(d.license_expiry_date) >= new Date();
   });
-
-  useEffect(() => {
-    async function loadData() {
-      const v = await fleetService.getVehicles(supabase);
-      const d = await fleetService.getDrivers(supabase);
-      const t = await fleetService.getTrips(supabase);
-      
-      setAllVehicles(v);
-      setAllDrivers(d);
-      setVehicles(v.filter(item => item.status === "Active")); // Only active vehicles can be dispatched
-      setDrivers(d.filter(item => item.status === "Active"));   // Only active drivers
-      setTrips(t);
-
-      const activeV = v.filter(item => item.status === "Active");
-      const activeD = d.filter(item => item.status === "Active");
-      if (activeV.length > 0) setSelectedVehicle(activeV[0].id);
-      if (activeD.length > 0) setSelectedDriver(activeD[0].id);
-
-      setLoading(false);
-    }
-    loadData();
-  }, [supabase]);
-
-  const handleMarkCompleted = async (trip) => {
-    const result = await fleetService.updateTrip(supabase, trip.id, {
-      status: "Completed",
-      end_time: new Date().toISOString()
-    });
-    if (result) {
-      const updatedTrips = await fleetService.getTrips(supabase);
-      setTrips(updatedTrips);
-      setStatusMsg("✅ Trip completed successfully!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
-  };
-
-  const handleOpenEdit = (trip) => {
-    setSelectedTrip(trip);
-    setEditForm({
-      route_name: trip.route_name,
-      vehicle_id: trip.vehicle_id,
-      driver_id: trip.driver_id,
-      region: trip.region,
-      status: trip.status
-    });
-    setIsEditOpen(true);
-  };
-
-  const handleSaveTrip = async (e) => {
-    e.preventDefault();
-    if (!selectedTrip) return;
-
-    const updates = {
-      route_name: editForm.route_name,
-      vehicle_id: editForm.vehicle_id,
-      driver_id: editForm.driver_id,
-      region: editForm.region,
-      status: editForm.status
-    };
-
-    if (updates.status === "Completed") {
-      updates.end_time = new Date().toISOString();
-    }
-
-    const result = await fleetService.updateTrip(supabase, selectedTrip.id, updates);
-    if (result) {
-      const updatedTrips = await fleetService.getTrips(supabase);
-      setTrips(updatedTrips);
-      setIsEditOpen(false);
-      setSelectedTrip(null);
-      setStatusMsg("✍️ Trip details updated!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!selectedTrip) return;
-    const result = await fleetService.deleteTrip(supabase, selectedTrip.id);
-    if (result) {
-      const updatedTrips = await fleetService.getTrips(supabase);
-      setTrips(updatedTrips);
-      setIsDeleteOpen(false);
-      setSelectedTrip(null);
-      setStatusMsg("🗑️ Dispatch canceled!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    }
-  };
 
   const handleDispatch = async (e) => {
     e.preventDefault();
-    if (!route || !selectedVehicle || !selectedDriver) {
-      setStatusMsg("❌ Please fill in all fields.");
+    if (!source || !destination || !selectedVehicle || !selectedDriver || !cargoWeight || !plannedDistance) {
+      showMsg("❌ Please fill in all required fields.", "error");
       return;
     }
 
-    const newTrip = {
-      id: `TRIP-${Math.floor(100 + Math.random() * 900)}`,
-      vehicle_id: selectedVehicle,
-      driver_id: selectedDriver,
-      status: "Active",
-      start_time: new Date().toISOString(),
-      end_time: null,
-      region: selectedRegion,
-      route_name: route
-    };
+    // CRITICAL: created_by is NOT NULL in DB — block if Clerk user not ready
+    if (!user?.id) {
+      showMsg("❌ Session not ready. Please wait a moment and try again.", "error");
+      return;
+    }
 
-    const result = await fleetService.createTrip(supabase, newTrip);
-    if (result) {
-      const updatedTrips = await fleetService.getTrips(supabase);
-      setTrips(updatedTrips);
-      setRoute("");
-      setStatusMsg("🚀 Trip dispatched successfully!");
-      setTimeout(() => setStatusMsg(""), 3000);
+    const vehicle = vehicles.find(v => v.id === selectedVehicle);
+    if (vehicle && parseFloat(cargoWeight) > parseFloat(vehicle.max_load_capacity)) {
+      showMsg(`❌ Cargo weight (${cargoWeight} kg) exceeds vehicle capacity (${vehicle.max_load_capacity} kg).`, "error");
+      return;
+    }
+
+    try {
+      await fleetService.createTrip(supabase, {
+        source,
+        destination,
+        vehicle_id: selectedVehicle,
+        driver_id: selectedDriver,
+        cargo_weight: parseFloat(cargoWeight),
+        planned_distance: parseFloat(plannedDistance),
+        status: "Dispatched",
+        created_by: user.id   // guaranteed non-null by guard above
+      });
+      // Reload first so availableVehicles/Drivers list is fresh
+      await reload();
+      setSource(""); setDestination(""); setCargoWeight(""); setPlannedDistance("");
+      setSelectedVehicle(""); setSelectedDriver("");
+      showMsg("✅ Trip dispatched! Vehicle and driver are now 'On Trip'.", "success");
+    } catch (err) {
+      showMsg(`❌ Dispatch failed: ${err.message}`, "error");
     }
   };
 
-  const activeTrips = trips.filter(t => t.status === "Active" || t.status === "Delayed");
+  const handleCompleteTrip = async (e) => {
+    e.preventDefault();
+    if (!tripToComplete) return;
+    try {
+      await fleetService.updateTrip(supabase, tripToComplete.id, {
+        status: "Completed",
+        actual_distance: parseFloat(actualDistance) || null,
+        fuel_consumed_liters: parseFloat(fuelConsumed) || null
+      });
+      await reload();
+      setIsCompleteOpen(false);
+      setTripToComplete(null);
+      setActualDistance(""); setFuelConsumed("");
+      showMsg("✅ Trip completed! Vehicle and driver returned to Available.", "success");
+    } catch (err) {
+      showMsg(`❌ Error: ${err.message}`, "error");
+    }
+  };
+
+  const handleCancelTrip = async (trip) => {
+    try {
+      await fleetService.updateTrip(supabase, trip.id, { status: "Cancelled" });
+      await reload();
+      showMsg("🚫 Trip cancelled. Resources freed.", "info");
+    } catch (err) {
+      showMsg(`❌ Error: ${err.message}`, "error");
+    }
+    setActiveDropdown(null);
+  };
+
+  const handleDeleteTrip = async () => {
+    if (!tripToDelete) return;
+    try {
+      await fleetService.deleteTrip(supabase, tripToDelete.id);
+      await reload();
+      setIsDeleteOpen(false);
+      setTripToDelete(null);
+      showMsg("🗑️ Trip record deleted.", "info");
+    } catch (err) {
+      showMsg(`❌ Error: ${err.message}`, "error");
+    }
+  };
+
+  const activeTrips = trips.filter(t => t.status === "Dispatched");
+
+  const msgColor = statusType === "error"
+    ? "text-rose-400 border-rose-800/50 bg-rose-950/30"
+    : statusType === "success"
+    ? "text-emerald-400 border-emerald-800/50 bg-emerald-950/30"
+    : "text-zinc-300 border-zinc-800 bg-zinc-900";
 
   if (loading) {
     return (
@@ -163,339 +165,219 @@ export default function DispatchView() {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Trip Dispatcher</h1>
-        <p className="text-sm text-zinc-400">Initiate new dispatches, map routes, and assign vehicles.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-white">Dispatch Control</h1>
+        <p className="text-sm text-zinc-400">Assign routes to vehicles and drivers. DB triggers manage status transitions automatically.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Dispatch Form (Left 1 Column) */}
+        {/* Dispatch Form */}
         <div className="lg:col-span-1 p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Send className="w-4 h-4 text-amber-500" /> New Dispatch Form
+            <Send className="w-4 h-4 text-amber-500" /> New Dispatch
           </h3>
-          <p className="text-xs text-zinc-400">Select active resources and assign a destination route.</p>
+          <p className="text-xs text-zinc-400">Only available vehicles and drivers with valid licenses are shown.</p>
 
-          <form onSubmit={handleDispatch} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Route Name</label>
-              <input
-                type="text"
-                required
-                placeholder="Dallas Main Depot -> Houston Hub"
-                value={route}
-                onChange={(e) => setRoute(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-650"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Select Vehicle (Active)</label>
-              <select
-                value={selectedVehicle}
-                onChange={(e) => setSelectedVehicle(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-              >
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>{v.id} - {v.name} ({v.type})</option>
-                ))}
-                {vehicles.length === 0 && <option value="">No Active Vehicles Available</option>}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Assign Driver (Active)</label>
-              <select
-                value={selectedDriver}
-                onChange={(e) => setSelectedDriver(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-              >
-                {drivers.map(d => (
-                  <option key={d.id} value={d.id}>{d.id} - {d.name}</option>
-                ))}
-                {drivers.length === 0 && <option value="">No Active Drivers Available</option>}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Target Region</label>
-              <select
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-              >
-                <option value="North">North Region</option>
-                <option value="East">East Region</option>
-                <option value="South">South Region</option>
-                <option value="West">West Region</option>
-              </select>
-            </div>
-
-            {statusMsg && (
-              <div className="p-3 rounded-lg text-xs font-semibold bg-zinc-950 border border-zinc-850 text-center">
-                {statusMsg}
+          {isWriteAllowed ? (
+            <form onSubmit={handleDispatch} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Source (Origin) *</label>
+                <input required value={source} onChange={e => setSource(e.target.value)}
+                  placeholder="Mumbai Depot" className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600" />
               </div>
-            )}
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Destination *</label>
+                <input required value={destination} onChange={e => setDestination(e.target.value)}
+                  placeholder="Pune Warehouse" className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Vehicle *</label>
+                <select required value={selectedVehicle} onChange={e => setSelectedVehicle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer">
+                  <option value="">-- Select Available Vehicle --</option>
+                  {availableVehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.registration_number} — {v.name} (Max: {v.max_load_capacity} kg)</option>
+                  ))}
+                  {availableVehicles.length === 0 && <option disabled>No vehicles available</option>}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Driver *</label>
+                <select required value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer">
+                  <option value="">-- Select Available Driver --</option>
+                  {availableDrivers.map(d => (
+                    <option key={d.id} value={d.id}>{d.name} — {d.license_number} (Score: {d.safety_score})</option>
+                  ))}
+                  {availableDrivers.length === 0 && <option disabled>No eligible drivers</option>}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-medium">Cargo Weight (kg) *</label>
+                  <input required type="number" min="0.01" step="0.01" value={cargoWeight} onChange={e => setCargoWeight(e.target.value)}
+                    placeholder="5000" className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-medium">Planned Distance (km) *</label>
+                  <input required type="number" min="0.1" step="0.1" value={plannedDistance} onChange={e => setPlannedDistance(e.target.value)}
+                    placeholder="250" className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-zinc-600" />
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={vehicles.length === 0 || drivers.length === 0}
-              className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-98 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-amber-500/20"
-            >
-              Dispatch Trip
-            </button>
-          </form>
+              {statusMsg && (
+                <div className={`p-3 rounded-lg text-xs font-semibold border text-center ${msgColor}`}>
+                  {statusMsg}
+                </div>
+              )}
+
+              <button type="submit" disabled={availableVehicles.length === 0 || availableDrivers.length === 0}
+                className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-98 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-amber-500/20">
+                Dispatch Trip
+              </button>
+            </form>
+          ) : (
+            <div className="py-8 text-center text-zinc-500 text-xs space-y-2">
+              <AlertTriangle className="w-8 h-8 mx-auto text-zinc-600" />
+              <p>Only Fleet Managers and Dispatchers can create trips.</p>
+            </div>
+          )}
         </div>
 
-        {/* Active Dispatches (Right 2 Columns) */}
+        {/* Active Dispatches */}
         <div className="lg:col-span-2 p-6 border rounded-xl bg-zinc-900/40 border-zinc-800/80 backdrop-blur-md space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-bold text-white">Active Dispatches</h3>
               <p className="text-xs text-zinc-400">Ongoing routes currently being monitored.</p>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center gap-1">
-              <Clock className="w-3 h-3 animate-spin" /> {activeTrips.length} Active
+            <span className="text-xs font-semibold text-zinc-500 bg-zinc-950 border border-zinc-850 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              {activeTrips.length} Active
             </span>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-3">
             {activeTrips.map(trip => {
-              const startFormatted = new Date(trip.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              
+              const vehicle = vehicles.find(v => v.id === trip.vehicle_id);
+              const driver = drivers.find(d => d.id === trip.driver_id);
               return (
                 <div key={trip.id} className="p-4 border rounded-xl bg-zinc-950/60 border-zinc-850 hover:border-zinc-800 transition-all">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    {/* Route */}
-                    <div className="space-y-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="space-y-1.5 flex-1">
                       <div className="text-sm font-semibold text-white flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-rose-500" />
-                        {trip.route_name}
+                        <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                        {trip.source} → {trip.destination}
                       </div>
-                      <div className="text-xs text-zinc-400 flex items-center gap-3">
+                      <div className="flex flex-wrap gap-3 text-xs text-zinc-400">
                         <span className="flex items-center gap-1 font-mono text-[10px]">
-                          <Truck className="w-3.5 h-3.5 text-zinc-500" /> {trip.vehicle_id}
+                          <Truck className="w-3 h-3" /> {vehicle?.registration_number || "Unknown"}
                         </span>
-                        <span className="flex items-center gap-1 text-[10px]">
-                          <Users className="w-3.5 h-3.5 text-zinc-500" /> {trip.driver_id}
+                        <span className="flex items-center gap-1 font-mono text-[10px]">
+                          <Users className="w-3 h-3" /> {driver?.name || "Unknown"}
                         </span>
-                        <span className="text-[10px] text-zinc-500">Region: {trip.region}</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">
+                          {trip.cargo_weight} kg • {trip.planned_distance} km
+                        </span>
                       </div>
                     </div>
-
-                    {/* Status & Time */}
-                    <div className="flex items-start gap-2 relative">
-                      <div className="text-right space-y-1">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium tracking-wide ${
-                          trip.status === "Delayed" 
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" 
-                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}>
-                          {trip.status}
-                        </span>
-                        <div className="text-[10px] text-zinc-500 flex items-center gap-1 justify-end font-mono">
-                          <Clock className="w-3 h-3" /> {startFormatted}
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Dispatched
+                      </span>
+                      {isWriteAllowed && (
+                        <div className={`relative ${activeDropdown === trip.id ? "z-30" : ""}`}>
+                          <button onClick={() => setActiveDropdown(activeDropdown === trip.id ? null : trip.id)}
+                            className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          {activeDropdown === trip.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setActiveDropdown(null)} />
+                              <div className="absolute right-0 mt-1 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 py-1 text-left">
+                                <button onClick={() => { setTripToComplete(trip); setActualDistance(""); setFuelConsumed(""); setIsCompleteOpen(true); setActiveDropdown(null); }}
+                                  className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
+                                  <CheckCircle className="w-3.5 h-3.5" /><span>Complete Trip</span>
+                                </button>
+                                <button onClick={() => handleCancelTrip(trip)}
+                                  className="w-full text-left px-3 py-1.5 text-xs text-amber-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
+                                  <XCircle className="w-3.5 h-3.5" /><span>Cancel Trip</span>
+                                </button>
+                                {isDeleteAllowed && (
+                                <button onClick={() => { setTripToDelete(trip); setIsDeleteOpen(true); setActiveDropdown(null); }}
+                                  className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
+                                  <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
+                                </button>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
-                      </div>
-
-                      <button
-                        onClick={() => setActiveDropdown(activeDropdown === trip.id ? null : trip.id)}
-                        className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer self-start"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {activeDropdown === trip.id && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-10" 
-                            onClick={() => setActiveDropdown(null)} 
-                          />
-                          <div className="absolute right-0 mt-8 w-36 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1 text-left">
-                            <button
-                              onClick={() => {
-                                handleMarkCompleted(trip);
-                                setActiveDropdown(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-zinc-800 hover:text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              <span>Complete</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleOpenEdit(trip);
-                                setActiveDropdown(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <Edit className="w-3.5 h-3.5 text-zinc-500" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedTrip(trip);
-                                setIsDeleteOpen(true);
-                                setActiveDropdown(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 hover:text-rose-300 flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
-                              <span>Cancel Trip</span>
-                            </button>
-                          </div>
-                        </>
                       )}
                     </div>
                   </div>
                 </div>
               );
             })}
-            
             {activeTrips.length === 0 && (
               <div className="py-12 border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center text-zinc-500 gap-2">
-                <AlertTriangle className="w-8 h-8 text-zinc-650" />
-                <p className="text-xs">No active dispatches on the road.</p>
+                <CheckCircle className="w-8 h-8 text-zinc-650" />
+                <p className="text-xs">No active dispatches at this time.</p>
               </div>
             )}
           </div>
         </div>
-
       </div>
 
-      {/* Edit Dispatch Modal */}
-      {isEditOpen && selectedTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
+      {/* Complete Trip Modal */}
+      {isCompleteOpen && tripToComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
           <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Edit Active Dispatch</h3>
-              <button
-                onClick={() => setIsEditOpen(false)}
-                className="text-zinc-400 hover:text-white font-semibold text-lg cursor-pointer"
-              >
-                &times;
-              </button>
+              <h3 className="text-lg font-bold text-white">Complete Trip</h3>
+              <button onClick={() => setIsCompleteOpen(false)} className="text-zinc-400 hover:text-white text-xl cursor-pointer">&times;</button>
             </div>
-
-            <form onSubmit={handleSaveTrip} className="space-y-4">
+            <p className="text-xs text-zinc-400">
+              <span className="text-white font-semibold">{tripToComplete.source} → {tripToComplete.destination}</span><br />
+              Enter actual distance and fuel consumed to update the vehicle odometer and log the fuel.
+            </p>
+            <form onSubmit={handleCompleteTrip} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Route Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.route_name}
-                  onChange={(e) => setEditForm({ ...editForm, route_name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
+                <label className="text-xs text-zinc-400 font-medium">Actual Distance (km)</label>
+                <input type="number" min="0" step="0.1" value={actualDistance} onChange={e => setActualDistance(e.target.value)}
+                  placeholder={`Planned: ${tripToComplete.planned_distance} km`}
+                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-800 focus:outline-none focus:ring-1 focus:ring-amber-500" />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-zinc-400 font-medium">Vehicle</label>
-                  <select
-                    value={editForm.vehicle_id}
-                    onChange={(e) => setEditForm({ ...editForm, vehicle_id: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    {allVehicles.map(v => (
-                      <option key={v.id} value={v.id}>{v.id} - {v.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs text-zinc-400 font-medium">Driver</label>
-                  <select
-                    value={editForm.driver_id}
-                    onChange={(e) => setEditForm({ ...editForm, driver_id: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    {allDrivers.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400 font-medium">Fuel Consumed (liters)</label>
+                <input type="number" min="0" step="0.01" value={fuelConsumed} onChange={e => setFuelConsumed(e.target.value)}
+                  placeholder="Optional — auto-logs fuel entry"
+                  className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-800 focus:outline-none focus:ring-1 focus:ring-amber-500" />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-zinc-400 font-medium">Region</label>
-                  <select
-                    value={editForm.region}
-                    onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="North">North</option>
-                    <option value="East">East</option>
-                    <option value="South">South</option>
-                    <option value="West">West</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs text-zinc-400 font-medium">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full px-3 py-2 text-sm text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Delayed">Delayed</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-3 flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsEditOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 transition cursor-pointer shadow-md shadow-amber-500/20"
-                >
-                  Save Updates
-                </button>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setIsCompleteOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer">Cancel</button>
+                <button type="submit"
+                  className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-emerald-500 rounded-lg hover:bg-emerald-400 transition cursor-pointer shadow-md shadow-emerald-500/20">Mark Complete</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Cancel Dispatch Confirmation Modal */}
-      {isDeleteOpen && selectedTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in">
+      {/* Delete Confirmation */}
+      {isDeleteOpen && tripToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
           <div className="w-full max-w-md p-6 border rounded-2xl bg-zinc-900 border-zinc-800 shadow-xl text-center space-y-4">
             <div className="h-12 w-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
               <AlertTriangle className="h-6 w-6" />
             </div>
-
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">Cancel Trip Dispatch</h3>
-              <p className="text-sm text-zinc-400">
-                Are you sure you want to cancel the dispatch for route <strong>{selectedTrip.route_name}</strong>? This will permanently delete the active trip log.
-              </p>
-            </div>
-
+            <h3 className="text-lg font-bold text-white">Delete Trip Record</h3>
+            <p className="text-sm text-zinc-400">Permanently delete this trip log? This cannot be undone.</p>
             <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={() => setIsDeleteOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-              >
-                Keep Active
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer shadow-md shadow-rose-600/20"
-              >
-                Cancel Dispatch
-              </button>
+              <button onClick={() => setIsDeleteOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition cursor-pointer">Keep</button>
+              <button onClick={handleDeleteTrip}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition cursor-pointer">Delete</button>
             </div>
           </div>
         </div>
