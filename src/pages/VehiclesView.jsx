@@ -3,7 +3,7 @@ import { Plus, Search, Truck, ShieldAlert } from "lucide-react";
 import fleetService from "../services/fleetService";
 import { useSupabase } from "../auth/supabase";
 
-export default function VehiclesView() {
+export default function VehiclesView({ role }) {
   const supabase = useSupabase();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,12 +80,14 @@ export default function VehiclesView() {
           <h1 className="text-2xl font-bold tracking-tight text-white">Vehicle Registry</h1>
           <p className="text-sm text-zinc-400">Manage and audit physical vehicles in your active fleet.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-amber-500/20"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" /> Add Vehicle
-        </button>
+        {role === 'Fleet Manager' && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-amber-500/20"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" /> Add Vehicle
+          </button>
+        )}
       </div>
 
       {/* Filter Toolbar */}
