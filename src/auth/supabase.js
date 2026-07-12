@@ -5,7 +5,7 @@ export function useSupabase() {
   const { session } = useSession();
 
   if (!session) {
-    throw new Error("No authenticated Clerk session found.");
+    return null;
   }
 
   return createClient(

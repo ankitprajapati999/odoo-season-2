@@ -95,8 +95,8 @@ function DashboardShell() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    if (!supabase || !user) return;
     async function checkProfile() {
-      if (!user) return;
       try {
         const data = await database.getById(supabase, "profiles", user.id);
         if (data) {
@@ -108,9 +108,11 @@ function DashboardShell() {
           // Read selected role from localStorage
           const selectedRole = localStorage.getItem("selected_role") || "Fleet Manager";
           const dbRole = selectedRole === "Dispatcher" ? "Driver" : selectedRole;
+          const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "";
+          
           const newProfile = {
             id: user.id,
-            email: user.primaryEmailAddress.emailAddress,
+            email: userEmail,
             full_name: user.fullName || "Operator",
             role: dbRole
           };
@@ -134,7 +136,7 @@ function DashboardShell() {
           const dbRole = selectedRole === "Dispatcher" ? "Driver" : selectedRole;
           const fallbackProfile = {
             id: user.id,
-            email: user.primaryEmailAddress?.emailAddress || "user@transitops.com",
+            email: user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "user@transitops.com",
             full_name: user.fullName || "Operator",
             role: dbRole
           };
@@ -176,7 +178,7 @@ function DashboardShell() {
     }
   };
 
-  if (loadingProfile) {
+  if (!supabase || loadingProfile) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 gap-4">
         <Activity className="w-8 h-8 text-amber-500 animate-spin" />
