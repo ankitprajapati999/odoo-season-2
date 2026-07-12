@@ -103,6 +103,36 @@ export default {
     return safeCreate(supabase, 'vehicles', vehicleData, mockVehicles);
   },
 
+  async updateVehicle(supabase, id, updates) {
+    try {
+      const result = await database.update(supabase, 'vehicles', id, updates);
+      return result;
+    } catch (error) {
+      console.warn(`Updating vehicle in db failed, simulating locally:`, error.message);
+      const index = mockVehicles.findIndex((v) => v.id === id);
+      if (index !== -1) {
+        mockVehicles[index] = { ...mockVehicles[index], ...updates };
+        return mockVehicles[index];
+      }
+      return null;
+    }
+  },
+
+  async deleteVehicle(supabase, id) {
+    try {
+      await database.deleteRecord(supabase, 'vehicles', id);
+      return true;
+    } catch (error) {
+      console.warn(`Deleting vehicle in db failed, simulating locally:`, error.message);
+      const index = mockVehicles.findIndex((v) => v.id === id);
+      if (index !== -1) {
+        mockVehicles.splice(index, 1);
+        return true;
+      }
+      return false;
+    }
+  },
+
   async createDriver(supabase, driverData) {
     return safeCreate(supabase, 'drivers', driverData, mockDrivers);
   },
