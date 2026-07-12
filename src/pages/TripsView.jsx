@@ -25,7 +25,9 @@ export default function TripsView({ role }) {
     fuel_consumed_liters: "", status: "Draft"
   });
 
+  // RLS: Fleet Manager + Driver can UPDATE trips. Only Fleet Manager can DELETE.
   const isWriteAllowed = role === "Fleet Manager" || role === "Driver";
+  const isDeleteAllowed = role === "Fleet Manager";
 
   async function reload() {
     const [t, v, d] = await Promise.all([
@@ -187,10 +189,12 @@ export default function TripsView({ role }) {
                                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                 <Edit className="w-3.5 h-3.5 text-zinc-500" /><span>Edit</span>
                               </button>
+                              {isDeleteAllowed && (
                               <button onClick={() => { setSelectedTrip(trip); setIsDeleteOpen(true); setActiveDropdown(null); }}
                                 className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                 <Trash2 className="w-3.5 h-3.5 text-rose-500/80" /><span>Delete</span>
                               </button>
+                              )}
                             </div>
                           </>
                         )}

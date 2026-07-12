@@ -29,7 +29,9 @@ export default function DriversView({ role }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [driverToDelete, setDriverToDelete] = useState(null);
 
-  const isWriteAllowed = role === "Fleet Manager" || role === "Safety Officer";
+  // RLS: Fleet Manager → full CRUD. Safety Officer → UPDATE only (no INSERT/DELETE).
+  const isFullWriteAllowed = role === "Fleet Manager";
+  const isEditAllowed = role === "Fleet Manager" || role === "Safety Officer";
 
   async function reload() {
     const data = await fleetService.getDrivers(supabase);
@@ -70,6 +72,8 @@ export default function DriversView({ role }) {
   });
 
   const handleOpenAddModal = () => {
+    // Only Fleet Manager can create new drivers
+    if (!isFullWriteAllowed) return;
     setIsEditMode(false);
     setEditingId(null);
     setFormData(blankForm());
@@ -157,7 +161,7 @@ export default function DriversView({ role }) {
           <h1 className="text-2xl font-bold tracking-tight text-white">Driver Registry</h1>
           <p className="text-sm text-zinc-400">Manage driver profiles, licenses, safety scores, and duty statuses.</p>
         </div>
-        {isWriteAllowed && (
+        {isFullWriteAllowed && (
           <button onClick={handleOpenAddModal}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-amber-500/20">
             <Plus className="w-4 h-4 stroke-[3]" /> Add Driver
@@ -232,7 +236,7 @@ export default function DriversView({ role }) {
                       {driver.status}
                     </span>
                   </td>
-                  {isWriteAllowed && (
+                  {isEditAllowed && (
                     <td className="py-4 px-4 text-center relative">
                       <button onClick={() => setActiveDropdown(activeDropdown === driver.id ? null : driver.id)}
                         className="p-1 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-850 transition-colors cursor-pointer">
@@ -246,10 +250,12 @@ export default function DriversView({ role }) {
                               className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 cursor-pointer">
                               <Edit className="w-3.5 h-3.5 text-zinc-500" /><span>Edit</span>
                             </button>
+                            {isFullWriteAllowed && (
                             <button onClick={() => { setDriverToDelete(driver); setIsDeleteOpen(true); setActiveDropdown(null); }}
                               className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 hover:text-rose-300 flex items-center gap-1.5 cursor-pointer">
                               <Trash2 className="w-3.5 h-3.5 text-rose-500/80" /><span>Delete</span>
                             </button>
+                            )}
                           </div>
                         </>
                       )}

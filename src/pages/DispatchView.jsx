@@ -32,7 +32,9 @@ export default function DispatchView({ role }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState(null);
 
+  // RLS: Fleet Manager + Driver can INSERT/UPDATE trips. Only Fleet Manager can DELETE.
   const isWriteAllowed = role === "Fleet Manager" || role === "Driver";
+  const isDeleteAllowed = role === "Fleet Manager";
 
   const showMsg = (msg, type = "info") => {
     setStatusMsg(msg);
@@ -68,6 +70,12 @@ export default function DispatchView({ role }) {
       return;
     }
 
+    // CRITICAL: created_by is NOT NULL in DB — block if Clerk user not ready
+    if (!user?.id) {
+      showMsg("❌ Session not ready. Please wait a moment and try again.", "error");
+      return;
+    }
+
     const vehicle = vehicles.find(v => v.id === selectedVehicle);
     if (vehicle && parseFloat(cargoWeight) > parseFloat(vehicle.max_load_capacity)) {
       showMsg(`❌ Cargo weight (${cargoWeight} kg) exceeds vehicle capacity (${vehicle.max_load_capacity} kg).`, "error");
@@ -83,12 +91,12 @@ export default function DispatchView({ role }) {
         cargo_weight: parseFloat(cargoWeight),
         planned_distance: parseFloat(plannedDistance),
         status: "Dispatched",
-        created_by: user?.id
+        created_by: user.id   // guaranteed non-null by guard above
       });
+      // Reload first so availableVehicles/Drivers list is fresh
       await reload();
       setSource(""); setDestination(""); setCargoWeight(""); setPlannedDistance("");
-      if (availableVehicles.length > 0) setSelectedVehicle(availableVehicles[0].id);
-      if (availableDrivers.length > 0) setSelectedDriver(availableDrivers[0].id);
+      setSelectedVehicle(""); setSelectedDriver("");
       showMsg("✅ Trip dispatched! Vehicle and driver are now 'On Trip'.", "success");
     } catch (err) {
       showMsg(`❌ Dispatch failed: ${err.message}`, "error");
@@ -285,10 +293,12 @@ export default function DispatchView({ role }) {
                                   className="w-full text-left px-3 py-1.5 text-xs text-amber-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                   <XCircle className="w-3.5 h-3.5" /><span>Cancel Trip</span>
                                 </button>
+                                {isDeleteAllowed && (
                                 <button onClick={() => { setTripToDelete(trip); setIsDeleteOpen(true); setActiveDropdown(null); }}
                                   className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer">
                                   <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                                 </button>
+                                )}
                               </div>
                             </>
                           )}

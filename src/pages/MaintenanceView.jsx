@@ -23,7 +23,8 @@ export default function MaintenanceView({ role }) {
   const [editForm, setEditForm] = useState({ vehicle_id: "", description: "", cost: "", start_date: "", end_date: "", status: "Active" });
   const [filterStatus, setFilterStatus] = useState("All");
 
-  const isWriteAllowed = role === "Fleet Manager" || role === "Safety Officer";
+  // RLS: Only Fleet Manager can modify maintenance_logs (Safety Officer is read-only here)
+  const isWriteAllowed = role === "Fleet Manager";
 
   async function reload() {
     const [m, v] = await Promise.all([
@@ -73,6 +74,11 @@ export default function MaintenanceView({ role }) {
   const handleSaveTicket = async (e) => {
     e.preventDefault();
     if (!selectedTicket) return;
+    // Validate end_date >= start_date (DB has a CHECK constraint for this)
+    if (editForm.end_date && editForm.start_date && editForm.end_date < editForm.start_date) {
+      showMsg("❌ End date cannot be before start date.", "error");
+      return;
+    }
     try {
       await fleetService.updateMaintenance(supabase, selectedTicket.id, {
         vehicle_id: editForm.vehicle_id,
