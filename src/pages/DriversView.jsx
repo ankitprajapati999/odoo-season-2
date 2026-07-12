@@ -206,7 +206,7 @@ export default function DriversView({ role }) {
                 <th className="py-3.5 px-4">Contact</th>
                 <th className="py-3.5 px-4">Safety Score</th>
                 <th className="py-3.5 px-4">Status</th>
-                {isWriteAllowed && <th className="py-3.5 px-4 w-12 text-center"></th>}
+                {isEditAllowed && <th className="py-3.5 px-4 w-12 text-center"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-850 text-xs text-zinc-300">
@@ -266,7 +266,7 @@ export default function DriversView({ role }) {
               {filteredDrivers.length === 0 && !loading && (
                 <tr>
                   <td colSpan="8" className="py-8 text-center text-zinc-500">
-                    No drivers found. {isWriteAllowed ? "Add one to get started." : ""}
+                    No drivers found. {isFullWriteAllowed ? "Add one to get started." : ""}
                   </td>
                 </tr>
               )}
