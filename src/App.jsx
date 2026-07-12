@@ -276,6 +276,7 @@ function DashboardShell() {
 export default function App() {
   const { isSignedIn, isLoaded } = useAuth();
   const [signupRole, setSignupRole] = useState("Fleet Manager");
+  const [isSigningUp, setIsSigningUp] = useState(false);
 
   useEffect(() => {
     // Ensure a default role is always cached
@@ -352,49 +353,78 @@ export default function App() {
           {/* Right Login Card Column */}
           <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950">
             <div className="w-full max-w-sm p-8 border rounded-2xl bg-zinc-900/60 border-zinc-850 backdrop-blur-md space-y-6 shadow-2xl shadow-black/60">
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold tracking-tight text-white">Console Portal</h3>
-                <p className="text-xs text-zinc-400">Select your active role to access your dashboard.</p>
-              </div>
+              
+              {!isSigningUp ? (
+                /* SIGN IN VIEW (No dropdown) */
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold tracking-tight text-white">Welcome back</h3>
+                    <p className="text-xs text-zinc-400">Please sign in to access your dashboard.</p>
+                  </div>
 
-              {/* Dropdown Role Selector */}
-              <div className="space-y-1.5 pt-2">
-                <label className="text-xs font-semibold text-zinc-400">Select Role</label>
-                <select
-                  value={signupRole}
-                  onChange={(e) => {
-                    setSignupRole(e.target.value);
-                    localStorage.setItem("selected_role", e.target.value);
-                  }}
-                  className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                >
-                  <option value="Fleet Manager">Fleet Manager</option>
-                  <option value="Dispatcher">Dispatcher</option>
-                  <option value="Safety Officer">Safety Officer</option>
-                  <option value="Financial Analyst">Financial Analyst</option>
-                </select>
-              </div>
+                  <div className="space-y-4 pt-2">
+                    <SignInButton mode="modal">
+                      <button className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-amber-500/20">
+                        Sign In
+                      </button>
+                    </SignInButton>
 
-              {/* Action Buttons */}
-              <div className="space-y-3 pt-2">
-                <SignInButton mode="modal">
-                  <button className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-amber-500/20">
-                    Sign In
-                  </button>
-                </SignInButton>
-
-                <div className="flex items-center gap-2.5 my-3.5">
-                  <hr className="flex-1 border-zinc-800" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-650">or</span>
-                  <hr className="flex-1 border-zinc-800" />
+                    <p className="text-xs text-zinc-500 text-center">
+                      Don't have an account?{" "}
+                      <button
+                        onClick={() => setIsSigningUp(true)}
+                        className="text-amber-500 hover:underline font-semibold cursor-pointer"
+                      >
+                        Create Account
+                      </button>
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                /* SIGN UP VIEW (Contains dropdown role selector) */
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold tracking-tight text-white">Create Account</h3>
+                    <p className="text-xs text-zinc-400">Select your active role to register.</p>
+                  </div>
 
-                <SignUpButton mode="modal">
-                  <button className="w-full py-2.5 text-xs font-bold text-zinc-300 border border-zinc-800 rounded-lg hover:bg-zinc-800 active:scale-[0.98] transition-all cursor-pointer">
-                    Sign Up
-                  </button>
-                </SignUpButton>
-              </div>
+                  {/* Dropdown Role Selector */}
+                  <div className="space-y-1.5 pt-2">
+                    <label className="text-xs font-semibold text-zinc-400">Select Role</label>
+                    <select
+                      value={signupRole}
+                      onChange={(e) => {
+                        setSignupRole(e.target.value);
+                        localStorage.setItem("selected_role", e.target.value);
+                      }}
+                      className="w-full px-3 py-2 text-xs text-white border rounded-lg bg-zinc-950 border-zinc-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                    >
+                      <option value="Fleet Manager">Fleet Manager</option>
+                      <option value="Dispatcher">Dispatcher</option>
+                      <option value="Safety Officer">Safety Officer</option>
+                      <option value="Financial Analyst">Financial Analyst</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-4 pt-2">
+                    <SignUpButton mode="modal">
+                      <button className="w-full py-2.5 text-xs font-bold text-zinc-950 bg-amber-500 rounded-lg hover:bg-amber-450 active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-amber-500/20">
+                        Sign Up
+                      </button>
+                    </SignUpButton>
+
+                    <p className="text-xs text-zinc-500 text-center">
+                      Already have an account?{" "}
+                      <button
+                        onClick={() => setIsSigningUp(false)}
+                        className="text-amber-500 hover:underline font-semibold cursor-pointer"
+                      >
+                        Sign In
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* RLS notice */}
               <div className="p-3 border rounded-lg bg-zinc-950/40 border-zinc-850 flex items-start gap-2.5">
