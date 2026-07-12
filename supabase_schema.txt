@@ -1,0 +1,177 @@
+-- ==========================================
+-- Supabase Schema DDL & Seed Data
+-- ==========================================
+-- This file contains SQL queries to set up the database tables
+-- and seed initial records for the TransitOps Fleet Management System.
+-- Copy and paste these statements into the Supabase SQL Editor.
+
+-- 1. VEHICLES TABLE
+CREATE TABLE IF NOT EXISTS public.vehicles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('Truck', 'Van', 'Mini', 'Bus', 'SUV', 'Sedan')),
+    capacity TEXT NOT NULL,
+    region TEXT NOT NULL,
+    fuel_efficiency TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('Active', 'In Shop', 'Off Duty', 'Maintenance')),
+    license_plate TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on public.vehicles
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+
+-- Select policies
+CREATE POLICY "Allow public read access to vehicles" 
+ON public.vehicles FOR SELECT USING (true);
+
+-- Write policies (for authorized users)
+CREATE POLICY "Allow authenticated users to write vehicles" 
+ON public.vehicles FOR ALL TO authenticated USING (true);
+
+
+-- 2. DRIVERS TABLE
+CREATE TABLE IF NOT EXISTS public.drivers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    license_number TEXT NOT NULL,
+    safety_score INTEGER DEFAULT 100 CHECK (safety_score BETWEEN 0 AND 100),
+    status TEXT NOT NULL CHECK (status IN ('Active', 'Off Duty', 'On Leave')),
+    phone TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on public.drivers
+ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
+
+-- Select policies
+CREATE POLICY "Allow public read access to drivers" 
+ON public.drivers FOR SELECT USING (true);
+
+-- Write policies
+CREATE POLICY "Allow authenticated users to write drivers" 
+ON public.drivers FOR ALL TO authenticated USING (true);
+
+
+-- 3. TRIPS TABLE
+CREATE TABLE IF NOT EXISTS public.trips (
+    id TEXT PRIMARY KEY,
+    vehicle_id TEXT REFERENCES public.vehicles(id) ON DELETE SET NULL,
+    driver_id TEXT REFERENCES public.drivers(id) ON DELETE SET NULL,
+    status TEXT NOT NULL CHECK (status IN ('On Time', 'Delayed', 'Completed', 'Active')),
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE,
+    region TEXT NOT NULL,
+    route_name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on public.trips
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+
+-- Select policies
+CREATE POLICY "Allow public read access to trips" 
+ON public.trips FOR SELECT USING (true);
+
+-- Write policies
+CREATE POLICY "Allow authenticated users to write trips" 
+ON public.trips FOR ALL TO authenticated USING (true);
+
+
+-- 4. MAINTENANCE LOGS TABLE
+CREATE TABLE IF NOT EXISTS public.maintenance (
+    id TEXT PRIMARY KEY,
+    vehicle_id TEXT REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    issue TEXT NOT NULL,
+    priority TEXT NOT NULL CHECK (priority IN ('Low', 'Medium', 'High', 'Critical')),
+    status TEXT NOT NULL CHECK (status IN ('Pending', 'In Progress', 'Completed')),
+    cost NUMERIC DEFAULT 0.0,
+    date DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on public.maintenance
+ALTER TABLE public.maintenance ENABLE ROW LEVEL SECURITY;
+
+-- Select policies
+CREATE POLICY "Allow public read access to maintenance" 
+ON public.maintenance FOR SELECT USING (true);
+
+-- Write policies
+CREATE POLICY "Allow authenticated users to write maintenance" 
+ON public.maintenance FOR ALL TO authenticated USING (true);
+
+
+-- 5. EXPENSES TABLE
+CREATE TABLE IF NOT EXISTS public.expenses (
+    id TEXT PRIMARY KEY,
+    vehicle_id TEXT REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('Fuel', 'Tolls', 'Maintenance', 'Insurance', 'Other')),
+    amount NUMERIC DEFAULT 0.0,
+    description TEXT,
+    date DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on public.expenses
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+
+-- Select policies
+CREATE POLICY "Allow public read access to expenses" 
+ON public.expenses FOR SELECT USING (true);
+
+-- Write policies
+CREATE POLICY "Allow authenticated users to write expenses" 
+ON public.expenses FOR ALL TO authenticated USING (true);
+
+
+-- ==========================================
+-- SEED DATA
+-- ==========================================
+
+-- Seed Vehicles
+INSERT INTO public.vehicles (id, name, type, capacity, region, fuel_efficiency, status, license_plate) VALUES
+('VEH-001', 'Heavy Duty Semi-Truck', 'Truck', '15 Tons', 'North', '6.2 km/l', 'Active', 'TX-982-PL'),
+('VEH-002', 'Express Delivery Van', 'Van', '2 Tons', 'East', '11.5 km/l', 'Active', 'NY-441-TR'),
+('VEH-003', 'Urban Shuttle Bus', 'Bus', '5 Tons', 'South', '8.0 km/l', 'Maintenance', 'CA-102-SH'),
+('VEH-004', 'Compact Electric Mini', 'Mini', '500 kg', 'West', '22.0 km/l', 'Active', 'WA-707-EL'),
+('VEH-005', 'Refrigerated Cargo Truck', 'Truck', '8 Tons', 'North', '7.1 km/l', 'In Shop', 'IL-819-RF'),
+('VEH-006', 'High-Capacity Cargo Van', 'Van', '3.5 Tons', 'East', '10.2 km/l', 'Off Duty', 'FL-302-CV'),
+('VEH-007', 'Intercity Coach Bus', 'Bus', '12 Tons', 'South', '5.8 km/l', 'Active', 'NV-550-CO'),
+('VEH-008', 'Rapid Dispatch Mini', 'Mini', '750 kg', 'West', '18.5 km/l', 'In Shop', 'OR-119-RD')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Drivers
+INSERT INTO public.drivers (id, name, license_number, safety_score, status, phone) VALUES
+('DRV-001', 'Alex Johnson', 'DL-TEX-892', 96, 'Active', '+1-555-0192'),
+('DRV-002', 'Sarah Martinez', 'DL-NYY-402', 98, 'Active', '+1-555-0187'),
+('DRV-003', 'Marcus Vance', 'DL-CAL-110', 82, 'Active', '+1-555-0104'),
+('DRV-004', 'Elena Rostova', 'DL-WAS-701', 95, 'Off Duty', '+1-555-0177'),
+('DRV-005', 'David Kim', 'DL-ILL-881', 89, 'On Leave', '+1-555-0155'),
+('DRV-006', 'Jordan Brooks', 'DL-FLA-309', 91, 'Active', '+1-555-0123')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Trips
+INSERT INTO public.trips (id, vehicle_id, driver_id, status, start_time, end_time, region, route_name) VALUES
+('TRIP-801', 'VEH-001', 'DRV-001', 'Active', NOW() - INTERVAL '3 hours', NULL, 'North', 'Dallas Main Depot -> Houston Hub'),
+('TRIP-802', 'VEH-002', 'DRV-002', 'Active', NOW() - INTERVAL '1 hours', NULL, 'East', 'Queens Warehouse -> Brooklyn Local'),
+('TRIP-803', 'VEH-004', 'DRV-003', 'On Time', NOW() - INTERVAL '5 hours', NOW() - INTERVAL '10 minutes', 'West', 'Seattle Metro -> Bellevue Dispatch'),
+('TRIP-804', 'VEH-007', 'DRV-006', 'Delayed', NOW() - INTERVAL '4 hours', NULL, 'South', 'Miami Terminal -> Orlando Station'),
+('TRIP-805', 'VEH-006', 'DRV-004', 'Completed', NOW() - INTERVAL '24 hours', NOW() - INTERVAL '20 hours', 'East', 'Newark Cargo -> Philadelphia Depot')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Maintenance
+INSERT INTO public.maintenance (id, vehicle_id, issue, priority, status, cost, date) VALUES
+('MNT-001', 'VEH-003', 'Transmission Fluid Leak & Gear slippage', 'High', 'In Progress', 850.00, CURRENT_DATE - 2),
+('MNT-002', 'VEH-005', 'Brake Pad Replacement & Rotor resurfacing', 'Medium', 'Pending', 320.00, CURRENT_DATE - 1),
+('MNT-003', 'VEH-008', 'Engine Tune-Up & Oil Filter change', 'Low', 'Completed', 180.00, CURRENT_DATE - 5)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Expenses
+INSERT INTO public.expenses (id, vehicle_id, type, amount, description, date) VALUES
+('EXP-001', 'VEH-001', 'Fuel', 420.50, 'Full Diesel Tank refuel', CURRENT_DATE - 1),
+('EXP-002', 'VEH-002', 'Fuel', 85.00, 'Regular Unleaded gasoline refuel', CURRENT_DATE - 1),
+('EXP-003', 'VEH-001', 'Tolls', 45.00, 'I-45 Highway Toll Fees', CURRENT_DATE - 2),
+('EXP-004', 'VEH-003', 'Maintenance', 850.00, 'Transmission repair', CURRENT_DATE - 2),
+('EXP-005', 'VEH-004', 'Other', 25.00, 'Vehicle Wash & Detailing', CURRENT_DATE - 3)
+ON CONFLICT (id) DO NOTHING;
